@@ -5,7 +5,7 @@ Logs to JSONL format with timestamp, phase, model, tokens, cost, etc.
 
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -46,7 +46,7 @@ class ObservabilityLogger:
     ) -> None:
         """Log a single LLM call to JSONL."""
         entry = {
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "phase": phase,
             "model": model,
             "tokens": tokens,
