@@ -25,7 +25,7 @@ pip install -r requirements.txt
 ### Phase 0: Setup
 - Scaffold repo (done)
 - Load 4.25M dataset → DuckDB → Parquet
-- Pull one comparator (Census CBP)
+- Pull comparators: SUSB (employer firms) + NES (non-employer establishments)
 - Setup observability logger
 
 ### Phase 1: Baseline & Stratification

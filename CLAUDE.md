@@ -177,7 +177,7 @@ python evals/eval_runner.py  # Precision/recall against ground_truth.json
 ### Dataset Metadata
 
 The 4.25M company dataset has these characteristics (from Phase 0 sanity check):
-- **State field**: Contains non-standard codes; flag any mismatches vs. Census CBP comparator
+- **State field**: Contains non-standard codes; flag any mismatches vs. SUSB/NES comparators
 - **Website field**: Variable format (URL, domain, malformed)
 - **Industry field**: High cardinality; normalization is LLM-friendly
 - **Size field**: Categorical (S/M/L, or employee ranges — check schema)
