@@ -277,3 +277,7 @@ When extending, maintain the phase-based structure and **always log LLM costs** 
 ## Environment Variables
 
 No `.env` file is required for the base pipeline. Anthropic API key is read from `ANTHROPIC_API_KEY` (set via your shell or system). If adding external integrations (search, Census API, etc.), document required env vars here.
+
+## DB Schema
+- Whenever the user asks you to write, debug, or optimize SQL queries, you **must** reference the schema defined in `docs/db_schema.md`.
+- Ensure all column names and data types exactly match that document.
