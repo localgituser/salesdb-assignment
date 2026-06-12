@@ -27,10 +27,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Subagents
 
-This project uses two subagents defined in `.claude/agents/`:
+This project uses three subagents defined in `.claude/agents/`:
 
+- **data-profiler** — Phase 1 extended data quality auditing: field-type-aware distribution checks, cross-field consistency, null pattern analysis. Deterministic only (no LLM calls). Produces a Markdown section for `notes/part1_baseline_observations.md` and `data/processed/profiling_summary.json`.
 - **data-engineer** — produces work: Phase 2 gap candidates (`gap_candidates.json`), Phase 4 enrichment cascade output (`poc_enriched_sample.parquet`). Never marks its own output as verified.
-- **verifier** — checks work: Phase 2 spot-checks (15 records per gap candidate, independent re-derivation from raw data → `gap_findings.md`), Phase 4 eval (`eval_runner.py`, precision/recall). Never produces new gaps or enrichments, never edits the data-engineer's output files.
+- **verifier** — checks work: Phase 2 spot-checks (15 records per gap candidate, independent re-derivation from raw data → `notes/gap_findings.md`), Phase 4 eval (`eval_runner.py`, precision/recall). Never produces new gaps or enrichments, never edits the data-engineer's output files.
 
 **Invoke explicitly** — auto-delegation is unreliable. E.g.:
 - "Use the data-engineer subagent for Phase 2 gap detection"
@@ -110,10 +111,12 @@ This split is **intentional** — rules are deterministic and cacheable; LLM add
 
 ### Stratification & Tiering
 
-States are tiered by sample depth:
-- **Tier A** (≥100 records): Full confidence, include in ranked gap lists
-- **Tier B** (30–99): Directional, flag in outputs
-- **Tier C** (<30): Exclude from ranked lists, append to audit tables
+States are tiered by record depth (calibrated for the 4.16M-record dataset scale):
+- **Tier A** (≥ 50,000 records): Full confidence, include in ranked gap lists
+- **Tier B** (10,000–49,999): Directional, flag in outputs
+- **Tier C** (< 10,000): Exclude from ranked lists, append to audit tables
+
+**Tier C states**: Alaska, South Dakota, North Dakota. **Territories** (always excluded): Puerto Rico, American Samoa, Guam, Northern Mariana Islands. Territory record counts are 5–239 — too thin for any statistical conclusions.
 
 This tiering is defined in Phase 1 and referenced throughout.
 
@@ -174,24 +177,48 @@ python evals/eval_runner.py  # Precision/recall against ground_truth.json
 
 ## Important Patterns & Constraints
 
-### Dataset Metadata
+### Dataset Metadata (Phase 1 completed findings)
 
-The 4.25M company dataset has these characteristics (from Phase 0 sanity check):
-- **State field**: Contains non-standard codes; flag any mismatches vs. SUSB/NES comparators
-- **Website field**: Variable format (URL, domain, malformed)
-- **Industry field**: High cardinality; normalization is LLM-friendly
-- **Size field**: Categorical (S/M/L, or employee ranges — check schema)
+The 4.16M US record dataset (from Phase 1 baseline analysis):
+- **Primary key**: `handle` — perfectly unique (0 collisions, 0 nulls). Use as the stable entity identifier for all joins, logging, and merge-back across Phases 2–4.
+- **State field**: 3.32% of records have invalid/null state. Mostly recoverable via rules (case normalisation, abbreviation expansion, city-split recombination). True foreign records are a small fraction.
+- **Website field**: ~910K missing + ~62,057 records store a platform/social/builder URL (yelp.com, facebook.com, linktr.ee, wixsite.com, etc.) that is effectively NULL for Sales Intelligence. **True missing-website count is ~972K.** When computing fill rates or gap sizes, treat platform URLs as missing.
+- **Industry field**: 491 distinct labels; 3 semantic duplicate pairs covering ~329K records (LLM canonical merge needed). 341K records have no industry value.
+- **Size field**: Clean enum; 8 valid bands. 4.49% null rate (missingness only, no OOV values).
+- **Website platform blocklist** (treat as NULL): yelp.com, facebook.com, instagram.com, linkedin.com, twitter.com, linktr.ee, bit.ly, wixsite.com, weebly.com, wordpress.com, squarespace.com, google.com, amazon.com, youtube.com, and .edu/.mil/.gov institutional domains.
 
-Inspect via `data_sanity_check.py` for updated state/industry distributions.
+### Candidate Key Analysis (Phase 1 — completed)
 
-### Candidate Key Analysis (Phase 1 requirement)
+Analysis complete. Results:
+- `handle`: 0 collisions, 0 nulls → **primary merge key**
+- `name + state`: 17,618 duplicates (0.42% collision rate)
+- `name + domain`: misleading — 908,947 null domains are each counted as unique
 
-Phase 1 must evaluate candidate keys — this is explicitly required by Part 1 of the brief. Check uniqueness of:
-- `name + state`
-- `name + domain`
-- Any synthetic ID column
+Use `handle` for all enrichment operations. `name + state` is acceptable as a human-readable secondary key with the known collision caveat.
 
-Report collision rate per combination, identify the most defensible candidate key, and note it in `baseline_audit.md`. Do this with DuckDB GROUP BY + COUNT(*) — no LLM needed.
+### Phase 2 Gap Detection — Context for data-engineer
+
+SUSB state-level comparison shows all 51 states are ADEQUATE (35–90% coverage). **Do not chase state-level breadth gaps — they don't exist.** Focus on sub-state dimensions:
+- **industry × state**: Five HIGH/MODERATE_GAP sectors from SUSB+NES: Other Services (2.3% combined coverage), Construction (6.0%), Retail (6.3%), Wholesale Trade (18.6%), Accommodation & Food Services (27.9%)
+- **size × state**: Enterprise (500+) accounts are only 1.65% of records and are structurally thin — a sourcing gap, not enrichment opportunity
+
+Comparator source data: `src/comparator.py` (SUSB), `src/nes_comparator.py` (NES). Full analysis in `notes/part1_baseline_observations.md` Sections 8–10.
+
+### Phase 4 Run 1 Scope — Context for data-engineer
+
+Run 1 targets 51+ employee size bands exclusively (`size IN ('51-200', '201-500', '501-1K', '1K-5K', '5K-10K', '10K+')`). Source: `data/processed/sample_audit.parquet`.
+
+Batch composition (~300 records total):
+- ~100: 51–500 employees with website missing or in platform blocklist — worst-coverage states first (Iowa, Kansas, West Virginia, Tennessee, Oregon)
+- ~100: 51–500 employees with `industry = NULL` — top MODERATE_GAP sectors (Construction, Retail, Wholesale, Accommodation, Other Services)
+- ~50–100: 500+ employees with any missing field — enterprise floor-check
+
+Run 2 (micro/SMB, <51 employees) is deferred until Run 1 precision/recall results are in hand.
+
+### Phase 4 Eval Thresholds — Context for verifier
+
+- **Stage distribution signal**: if Stage 4 (Sonnet) accounts for >40% of resolved records, flag as a cost signal — the cascade is over-relying on the most expensive model
+- **Confidence calibration target**: among records where `confidence >= 0.8`, ≥80% should be correct per ground truth. Below this, the pipeline is over-claiming confidence.
 
 ### Trace Artifact — Single Source of Truth
 
@@ -227,7 +254,7 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
 logger.info(f"Phase 1: loaded {record_count:,} records")
-logger.warning(f"Tier C states (n<30): {tier_c_count}")
+logger.warning(f"Tier C states (n<10000): {tier_c_count}")
 ```
 
 ## Testing
