@@ -1,4 +1,6 @@
-notes/.env
+.env
+
+notes/
 
 data/raw/
 data/processed/
