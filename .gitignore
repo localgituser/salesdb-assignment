@@ -1,0 +1,11 @@
+notes/.env
+
+data/raw/
+data/processed/
+
+*.pyc
+__pycache__/
+.venv/
+venv/
+
+.claude/settings.local.json

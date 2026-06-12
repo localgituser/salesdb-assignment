@@ -1,0 +1,6 @@
+# Audit Prompt v1
+
+TODO: Audit agent prompt for Phase 2
+- Read baseline tables + comparator
+- Surface candidate gaps by state/industry/size
+- Fixed spot-check: 15 records per gap

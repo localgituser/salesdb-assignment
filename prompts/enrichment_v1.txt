@@ -1,0 +1,5 @@
+# Enrichment Prompt v1
+
+TODO: Enrichment prompts for Phase 4 cascade
+- Stage 3: Haiku verification prompt
+- Stage 4: Sonnet/frontier resolution prompt
