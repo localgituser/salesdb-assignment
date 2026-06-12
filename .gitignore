@@ -11,5 +11,5 @@ __pycache__/
 venv/
 
 .claude/settings.local.json
-/claude/plans/
-/claude/state/
+.claude/plans
+.claude/state
