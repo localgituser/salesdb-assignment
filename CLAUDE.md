@@ -15,6 +15,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Key constraint**: Hard $10 total LLM budget across all phases. Cost must be logged and checked per phase.
 
+**Note on Phase 6**: The 90-Day Pod Plan is a Notion deliverable, not a code phase — no script in `src/` corresponds to it. It's written last, informed by outputs from Phases 1-4.
+
 ## Tech Stack
 
 - **Data**: DuckDB (in-memory SQL), Pandas, Polars
@@ -23,7 +25,34 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Python**: 3.9+
 - **Environment**: Virtual environment (`venv/`), managed via `requirements.txt`
 
-## Architecture & Design Patterns
+## Subagents
+
+This project uses two subagents defined in `.claude/agents/`:
+
+- **data-engineer** — produces work: Phase 2 gap candidates (`gap_candidates.json`), Phase 4 enrichment cascade output (`poc_enriched_sample.parquet`). Never marks its own output as verified.
+- **verifier** — checks work: Phase 2 spot-checks (15 records per gap candidate, independent re-derivation from raw data → `gap_findings.md`), Phase 4 eval (`eval_runner.py`, precision/recall). Never produces new gaps or enrichments, never edits the data-engineer's output files.
+
+**Invoke explicitly** — auto-delegation is unreliable. E.g.:
+- "Use the data-engineer subagent for Phase 2 gap detection"
+- "Use the verifier subagent to spot-check the Phase 2 gap candidates"
+
+**Phase 3 (commercial framing) and Phase 5 (SKILL.md) are not delegated to subagents** — they are manual/Claude tasks with $0 LLM budget.
+
+**Never let one agent do both roles for the same phase.** The separation is the point — it's how trust calibration gets demonstrated (Part 2 of the brief).
+
+Verifier calls (spot-checks, eval_runner) do not count against the phase's LLM budget — they're read-only/deterministic by design.
+
+## Context Hygiene (avoid burning tokens)
+
+- **Never read the raw CSV or full Parquet files into context.** Use DuckDB SQL queries that return aggregates, `.head()`, or `LIMIT`-bounded samples only.
+- When inspecting `data/processed/observability.jsonl` or other large JSONL/JSON outputs, grep/filter for the relevant phase or gap_id — never cat the whole file.
+- When checking dataset schema or distributions, query DuckDB directly (`SELECT state, COUNT(*) FROM ... GROUP BY state`) rather than loading into pandas and printing.
+
+## Before re-running any LLM phase
+
+Check `data/processed/observability.jsonl` for existing entries tagged with that phase. If entries exist, **ask the user before re-running** — re-running an LLM phase consumes budget again from the fixed $10 total, and there's no automatic carryover or refund.
+
+
 
 ### Phase-Based Execution Model
 
@@ -31,9 +60,9 @@ Each phase is a standalone script in `src/`. They run sequentially but independe
 
 **Key files**:
 - `src/ingestion.py` — Load CSV into DuckDB, export to Parquet
-- `src/sampling.py` — Stratify by state/industry/size, tier states (A/B/C)
+- `src/sampling.py` — Stratify by state/industry/size, tier states (A/B/C), candidate key analysis
 - `src/rules.py` — Deterministic cleanup (URL/domain, regex normalization)
-- `src/pipeline.py` — Cascade enrichment (rules → search → Haiku → Sonnet)
+- `src/pipeline.py` — Cascade enrichment (rules → search → Haiku → Sonnet), with explicit retries/fallback state machine
 - `src/observability.py` — Cost tracking and logging
 
 ### Observability & Cost Tracking
@@ -55,7 +84,7 @@ logger.log_call(
 )
 ```
 
-Cost is tracked in `data/processed/cost_tracking.txt` (running total) and `data/processed/observability.jsonl` (per-call details). **Before running any LLM phase, check the budget**:
+Cost is tracked in `data/processed/cost_tracking.json` (running total + per-phase breakdown) and `data/processed/observability.jsonl` (per-call details). **Before running any LLM phase, check the budget**:
 
 ```python
 logger = ObservabilityLogger()
@@ -134,14 +163,14 @@ python evals/eval_runner.py  # Precision/recall against ground_truth.json
 - `data/processed/baseline_audit.md` — Fill-rate tables, sampling strategy
 - `data/processed/sample_audit.parquet` — Stratified sample for audit
 - `data/processed/observability.jsonl` — Line-delimited LLM call logs
-- `data/processed/cost_tracking.txt` — Running cost total (single float)
+- `data/processed/cost_tracking.json` — Running total + per-phase cost breakdown (single JSON object)
 - `data/enriched/poc_enriched_sample.parquet` — Enriched records post-Phase 4
 
 ### Documentation
 - `prompts/audit_v1.txt` — LLM prompt for Phase 2 gap detection
 - `prompts/enrichment_v1.txt` — LLM prompt for Phase 4 enrichment
-- `notes/strategy_v3.md` — Full execution plan with budgets and timelines
-- `skills/SKILL.md` — (Phase 5) Reusable skill documentation
+- `notes/strategy_v3.md` — Full execution plan with budgets, timelines, and brief Part mapping
+- `skills/SKILL.md` — (Phase 5) Reusable skill documentation (enrichment pipeline, market-parameterised)
 
 ## Important Patterns & Constraints
 
@@ -155,13 +184,26 @@ The 4.25M company dataset has these characteristics (from Phase 0 sanity check):
 
 Inspect via `data_sanity_check.py` for updated state/industry distributions.
 
+### Candidate Key Analysis (Phase 1 requirement)
+
+Phase 1 must evaluate candidate keys — this is explicitly required by Part 1 of the brief. Check uniqueness of:
+- `name + state`
+- `name + domain`
+- Any synthetic ID column
+
+Report collision rate per combination, identify the most defensible candidate key, and note it in `baseline_audit.md`. Do this with DuckDB GROUP BY + COUNT(*) — no LLM needed.
+
+### Trace Artifact — Single Source of Truth
+
+All LLM call logs go to **`data/processed/observability.jsonl`**. This is the submission's trace record. Do not create a separate `agent_traces.jsonl` — consolidate everything into `observability.jsonl`, filtered by `phase` tag when inspecting. The data-engineer agent definition of done references this file.
+
 ### Budget Enforcement
 
 - **Phase 0–1**: $0 (rules only)
 - **Phase 2**: $3 (agentic audit)
 - **Phase 3**: $0 (commercial framing, no LLM)
 - **Phase 4**: $5 (enrichment cascade, evals)
-- **Phase 5**: $2 (skill documentation, if LLM-assisted)
+- **Phase 5**: $0 (skill documentation, rules-based/manual — no LLM needed)
 
 If a phase's budget is exhausted, **stop LLM calls and log it**, never carry over budget from a later phase.
 

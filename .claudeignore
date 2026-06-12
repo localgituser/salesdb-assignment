@@ -1,0 +1,18 @@
+# Raw source data — large, never needed in context. Query via DuckDB instead.
+data/raw/
+*.csv
+
+# Large processed artifacts — query via DuckDB, don't read directly
+data/processed/*.parquet
+data/enriched/*.parquet
+
+# Logs — grep/filter instead of reading whole file
+data/processed/observability.jsonl
+data/processed/agent_traces.jsonl
+
+# Standard excludes
+venv/
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
