@@ -4,7 +4,7 @@ Usage:
     from src.config import CONFIG
     CONFIG.budget.total_usd          # 10.00
     CONFIG.gap_tiers.high_gap_max    # 0.10
-    CONFIG.market.run1_size_bands    # frozenset of size band strings
+    CONFIG.market.enrichable_size_bands  # frozenset of size band strings
     CONFIG.market.subregion_label    # "state"
 """
 
@@ -104,13 +104,13 @@ class Market(BaseModel):
     subregion_label: str
     dataset: MarketDataset
     comparators: MarketComparators
-    run1_size_bands: List[str]
+    enrichable_size_bands: List[str]
     excluded_subregions: List[str] = Field(default_factory=list)
     excluded_territories: List[str] = Field(default_factory=list)
 
     @property
-    def run1_size_bands_set(self) -> FrozenSet[str]:
-        return frozenset(self.run1_size_bands)
+    def enrichable_size_bands_set(self) -> FrozenSet[str]:
+        return frozenset(self.enrichable_size_bands)
 
 
 class ProjectConfig(BaseModel):

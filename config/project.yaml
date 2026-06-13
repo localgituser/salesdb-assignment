@@ -103,8 +103,11 @@ markets:
         source: NES
         vintage: 2023
         path: data/raw/nes_2023.csv
-    # Phase 4 Run 1 scope: enterprise/mid-market size bands only.
-    run1_size_bands:
+    # Phase 4 enrichable size bands — all bands the cascade runs against.
+    # Gate uses this to catch size=NULL / unexpected values in the batch.
+    enrichable_size_bands:
+      - "1-10"
+      - "11-50"
       - "51-200"
       - "201-500"
       - "501-1K"

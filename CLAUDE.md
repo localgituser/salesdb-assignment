@@ -205,16 +205,19 @@ SUSB state-level comparison shows all 51 states are ADEQUATE (35–90% coverage)
 
 Comparator source data: `src/comparator.py` (SUSB), `src/nes_comparator.py` (NES). Full analysis in `notes/part1_baseline_observations.md` Sections 8–10.
 
-### Phase 4 Run 1 Scope — Context for data-engineer
+### Phase 4 PoC Scope — Context for data-engineer
 
-Run 1 targets the enterprise/mid-market size bands defined in `config/project.yaml` → `markets.us.run1_size_bands` (currently 51+ employees). Source: `markets.us.dataset.sample` (currently `data/processed/sample_audit.parquet`).
+Single-pass PoC against a size-stratified sample spanning all four enrichable segments. Source: `markets.us.dataset.sample` (currently `data/processed/sample_audit.parquet`, 288 records after handle dedup from 300 quota). Sample builder: `src/sampling.py`.
 
-Batch composition (~300 records total):
-- ~100: 51–500 employees with website missing or in platform blocklist — worst-coverage states first (Iowa, Kansas, West Virginia, Tennessee, Oregon)
-- ~100: 51–500 employees with `industry = NULL` — top MODERATE_GAP sectors (Construction, Retail, Wholesale, Accommodation, Other Services)
-- ~50–100: 500+ employees with any missing field — enterprise floor-check
+Segment quotas (300 target → 288 unique): enterprise 60, mid-market 80, SMB 80, micro 80. Enterprise (500+) is oversampled relative to population share (1.65%) to give the eval statistical power on the primary ICP. Within each segment, records are split across three enrichment-target conditions: 50% missing website, 30% missing industry, 20% website set to a platform/social/builder URL.
 
-Run 2 (micro/SMB, <51 employees) is deferred until Run 1 precision/recall results are in hand.
+Pre-filters (applied at sampling time, not deferral):
+- `size IS NULL` excluded (no anchor for segment assignment)
+- `HIGH_CHURN_RISK` strict flag excluded for micro: `size='1-10' AND founded>=2015 AND website IS NULL AND type IS NULL` (~5,718 records)
+
+Per-segment precision/recall in the Phase 4 eval is the actionable signal — tells us which size bands the cascade is trustworthy for. The earlier two-run framing (51+ first, micro/SMB deferred) was discarded; see `notes/part1_baseline_observations.md` §2b for rationale.
+
+The enrichable size bands (all four segments) are listed in `config/project.yaml` → `markets.us.enrichable_size_bands`. The Phase 4 batch-quality gate (`src/gate.py::check_batch_quality`) uses this list to catch `size IS NULL` or unexpected band values — it no longer rejects sub-51 records.
 
 ### Phase 4 Eval Thresholds — Context for verifier
 

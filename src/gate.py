@@ -16,7 +16,7 @@ from src.observability import ObservabilityLogger
 PHASE_BUDGETS = CONFIG.budget.per_phase_usd
 TOTAL_BUDGET = CONFIG.budget.total_usd
 PLATFORM_BLOCKLIST = CONFIG.enrichment_rules.platform_blocklist_set
-RUN1_SIZE_BANDS = CONFIG.market.run1_size_bands_set
+ENRICHABLE_SIZE_BANDS = CONFIG.market.enrichable_size_bands_set
 STAGE4_COST_SIGNAL_THRESHOLD = CONFIG.cascade.stage4_cost_signal
 BATCH_MIN = CONFIG.cascade.batch_min
 BATCH_MAX = CONFIG.cascade.batch_max
@@ -122,14 +122,14 @@ def check_batch_quality(batch_path: str) -> List[GateResult]:
         results.append(GateResult(True, "batch_size", f"Batch size OK: {n} records"))
 
     if "size" in df.columns:
-        out_of_scope = df[~df["size"].isin(RUN1_SIZE_BANDS)]
+        out_of_scope = df[~df["size"].isin(ENRICHABLE_SIZE_BANDS)]
         if len(out_of_scope):
             results.append(GateResult(
-                False, "run1_size_scope",
-                f"{len(out_of_scope)} records outside Run 1 scope (size <51 employees)",
+                False, "size_scope",
+                f"{len(out_of_scope)} records with size NULL or outside enrichable bands",
             ))
         else:
-            results.append(GateResult(True, "run1_size_scope", "All records in 51+ size bands"))
+            results.append(GateResult(True, "size_scope", "All records in enrichable size bands"))
 
     if "website" in df.columns:
         def _is_platform(url) -> bool:
