@@ -58,6 +58,14 @@ NAICS_SECTORS = {
 # High-value size bands for null-state logging
 HIGH_VALUE_BANDS = ("51-200", "201-500", "501-1K", "1K-5K", "5K-10K", "10K+")
 
+# Sectors where SUSB counts only employer firms — sole-operator/gig volume is invisible
+EMPLOYER_ONLY_CAVEAT_SECTORS = {"48-49", "53", "56", "81", "23"}
+_EMPLOYER_ONLY_CAVEAT = (
+    "SUSB counts employer firms only. This sector includes significant "
+    "sole-operator/gig volume not captured by that benchmark. Gap may overstate "
+    "actual coverage shortfall; pair with NES before finalising."
+)
+
 
 def load_susb_state_sector(path: str) -> pd.DataFrame:
     """Return one row per (state_name, naics_code) with SUSB employer firm count."""
@@ -191,20 +199,45 @@ def build_gap_id(state: str, naics_code: str) -> str:
     return f"{state.replace(' ', '_')}_{naics_code.replace('-', '_')}"
 
 
+def _confidence(gap_tier: str, state_tier: str, naics_code: str) -> float:
+    base = {("HIGH_GAP", "A"): 0.90, ("HIGH_GAP", "B"): 0.75,
+            ("MODERATE_GAP", "A"): 0.75, ("MODERATE_GAP", "B"): 0.60}.get(
+        (gap_tier, state_tier), 0.60
+    )
+    if naics_code in EMPLOYER_ONLY_CAVEAT_SECTORS:
+        base = max(0.0, base - 0.15)
+    return round(base, 2)
+
+
+def _caveats(state_tier: str, naics_code: str) -> list:
+    out = []
+    if naics_code in EMPLOYER_ONLY_CAVEAT_SECTORS:
+        out.append(_EMPLOYER_ONLY_CAVEAT)
+    if state_tier == "B":
+        out.append("Tier B state — directional signal only, include with caveat in ranked outputs.")
+    return out
+
+
 def cross_tab_to_records(df: pd.DataFrame) -> list:
     records = []
     for _, r in df.iterrows():
         records.append({
             "gap_id": build_gap_id(r.state, r.naics_code),
+            "dimension": "industry×state",
+            "slice": f"{r.state} / {r.naics_desc}",
             "state": r.state,
             "naics_code": r.naics_code,
             "naics_desc": r.naics_desc,
             "our_records": int(r.our_records),
-            "susb_firms": int(r.susb_firms),
+            "comparator_records": int(r.susb_firms),
+            "comparator_source": "SUSB_2022",
             "coverage_ratio": round(float(r.coverage_ratio), 4),
             "coverage_pct": float(r.coverage_pct),
-            "gap_tier": r.gap_tier,
+            "tier": r.gap_tier,
             "state_tier": r.state_tier,
+            "confidence": _confidence(r.gap_tier, r.state_tier, r.naics_code),
+            "status": "unverified",
+            "caveats": _caveats(r.state_tier, r.naics_code),
         })
     return records
 
