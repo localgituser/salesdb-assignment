@@ -79,7 +79,7 @@ These are **rules-fixable** — normalisation (case folding, whitespace trim, ab
 1. Case-fold + trim: catches "District Of Columbia" → "District of Columbia"
 2. Abbreviation expansion map: "D.C." → "District of Columbia", "Tx Texas" → "Texas", "Fl Florida" → "Florida"
 3. City-in-state lookup: "Portland" → "Oregon" (or flag for manual review if ambiguous), "York" → flag
-4. After normalisation, re-run `record_counts` query to confirm recovery rate before Phase 4 Run 1
+4. After normalisation, re-run `record_counts` query to confirm recovery rate before Phase 4 enrichment
 
 ---
 
@@ -126,20 +126,35 @@ Within each state, records are stratified by **industry sector** (proportional t
 
 So if the true within-slice prevalence is ≥ 20%, there is only a ~3.5% chance the 15-record spot-check sees zero hits — i.e., **~96.5% power to reject the "no gap" null at the 20% prevalence threshold**. For lower prevalence (p = 0.10), power drops to ~79% — acceptable for directional confirmation but not a guarantee. The 20% threshold is the operational floor for "structural" gaps in this audit; finer-grained gaps are flagged but not ranked.
 
-### Phase 4 Enrichment PoC Sample (~300 records) — Two-Run Strategy
+### Phase 4 Enrichment PoC Sample (~300 records) — Single-Run, Size-Stratified
 
-The PoC runs in two passes. **Run 1 (this PoC) targets 51+ employee size bands exclusively.** Run 2 applies Run 1 learnings to micro/SMB (<51) in a separate pass.
+The PoC runs in a single pass against a size-stratified sample spanning the full enrichable distribution. The earlier two-run framing (51+ first, micro/SMB deferred) was discarded: a PoC's job is to stress-test the cascade, and scoping out 85% of the dataset would tell us nothing about where the pipeline actually breaks. The vintage concern is handled by a strict pre-filter, not deferral.
 
-**Run 1 batch composition (all records must have `size IN ('51-200', '201-500', '501-1K', '1K-5K', '5K-10K', '10K+')`):**
-- ~100 records: 51–500 employees with `website = NULL` across worst-coverage states (Iowa, Kansas, West Virginia, Tennessee, Oregon)
-- ~100 records: 51–500 employees with `industry = NULL` across top-5 MODERATE_GAP sectors (Construction, Retail, Wholesale, Accommodation, Other Services)
-- ~50–100 records: 500+ employees with any missing field — enterprise floor-check
+**Pre-filter (applied, not deferred)**: Exclude records matching `size = '1-10' AND founded >= 2015 AND website IS NULL AND type IS NULL` — the `HIGH_CHURN_RISK` flag from Section 5b. Strict-match count is only ~5,718 records, so excluding them costs almost nothing and removes the highest-stale-entity-risk slice. `size IS NULL` records are also excluded (no anchor field for segment assignment).
 
-**Rationale for 51+ scoping**: The dataset is 2023-vintage (~3 years old). A company with 1–3 employees founded after 2015 is at meaningful risk of no longer existing in 2026 — enriching a closed entity wastes tokens and pollutes the output sample. Firms with 51+ employees average 38–61 years in age (see Section 5b); 3-year survival probability is high (>95% for established mid-market/enterprise). Run 1 maximises enrichment ROI by operating only in the low-churn-risk segment.
+**Sample composition (~300 records, 4 segments × 3 conditions):**
 
-**Run 2 (post-Run 1)**: Micro/SMB (<51 employees) batch, scoped after Run 1 eval results are in hand. Run 1 precision/recall, fallback trigger rates, and source confidence patterns inform the cost controls and confidence thresholds appropriate for the higher-noise small business segment.
+| Segment | Total | missing_website | missing_industry | platform_url |
+|---|---|---|---|---|
+| Enterprise (500+) | 60 | 30 | 18 | 12 |
+| Mid-market (51–500) | 80 | 40 | 24 | 16 |
+| SMB (11–50) | 80 | 40 | 24 | 16 |
+| Micro (1–10, churn-filtered) | 80 | 40 | 24 | 16 |
+| **Total (pre-dedup)** | **300** | **150** | **90** | **60** |
 
-**Cost**: Run 1 batch costs ~$0.50–1.50 at Haiku rates, fits the $5 Phase 4 budget, and exercises the full cascade (rules → search → Haiku verify → Sonnet fallback).
+Enterprise is heavily oversampled (~0.05% population weight gets 20% of the sample). A record may satisfy multiple conditions (e.g., both website and industry missing); handle-level dedup collapses these — actual sample size is **288 records**.
+
+The `platform_url` condition forces the rules-stage blocklist to fire (yelp/facebook/wixsite etc. as the website value) and is the right test for the platform-URL reclassification logic. Sample is deterministic via `hash(handle || seed)`.
+
+**Why this beats the two-run plan**:
+- Tests the full rules → search → Haiku → Sonnet cascade under actual stress; micro is where Stage 4 over-firing surfaces.
+- Produces precision/recall *per size band* in one $5 pass — directly answers which segments the cascade is trustworthy for.
+- No deferred deliverable risk (Run 2 might never ship); single eval covers the whole dataset story.
+- Same token budget.
+
+**Cost**: ~$0.50–1.50 at Haiku rates, fits the $5 Phase 4 budget.
+
+Script: `src/sampling.py` → `data/processed/sample_audit.parquet`. Each row is stamped with `poc_segment` and `poc_condition` so the eval can report per-cell.
 
 ---
 
@@ -258,7 +273,7 @@ _Tier A+B states (≥10K records). Mid-market = size bands 51-200 + 201-500. Ent
 
 **Finding**: All 48 Tier A+B states are below parity on website fill for BOTH mid-market (target ≥95%) AND enterprise (target ≥99%). Best mid-market is Delaware at 93.3%; best enterprise is Vermont at 97.9%. The parity targets in the table below are aspirational ceilings — no US state currently clears them on `website`.
 
-Worst 10 states on mid-market website fill (the Phase 4 Run 1 priority slice):
+Worst 10 states on mid-market website fill (a Phase 4 enrichment priority slice):
 
 | State | Mid-market n | Mid-market website % | Enterprise n | Enterprise website % |
 |---|---|---|---|---|
@@ -273,7 +288,7 @@ Worst 10 states on mid-market website fill (the Phase 4 Run 1 priority slice):
 | Kentucky | 3,042 | 87.6 | 604 | 91.7 |
 | Hawaii | 1,076 | 87.6 | 188 | 92.0 |
 
-**Implication for Phase 4 Run 1 batch composition**: target the mid-market slices in Mississippi, West Virginia, Arkansas, New Mexico, Alabama, Oklahoma, and Louisiana first — they have the largest parity gap and a meaningful absolute record count (≥950 per state). Iowa and Kansas (worst overall avg fill in §4) are dominated by their micro/SMB cohorts; their mid-market populations are mid-pack on website fill.
+**Implication for Phase 4 sample weighting**: within the mid-market segment of the PoC sample (see Section 2b), prioritise records from Mississippi, West Virginia, Arkansas, New Mexico, Alabama, Oklahoma, and Louisiana — they have the largest parity gap and a meaningful absolute record count (≥950 per state). Iowa and Kansas (worst overall avg fill in §4) are dominated by their micro/SMB cohorts; their mid-market populations are mid-pack on website fill.
 
 ### 4c. Coverage parity definition (size-stratified)
 
@@ -306,7 +321,7 @@ A state reaches **true parity** when both completeness AND correctness targets a
 
 **State-tier variant on completeness**: Tier A states are held to the full size-band table above. Tier B states are scored *directionally* — they meet parity if they are within 5 percentage points of the Tier A target (e.g., Tier B enterprise website ≥ 94% rather than ≥ 99%) given thinner record counts. Tier C is excluded from parity scoring entirely.
 
-**Run 1 / Run 2 scope**: Parity targets for enterprise (500+) and mid-market (51–500) bands are the Phase 4 Run 1 goal. Micro (<11) and SMB (11–50) parity targets are **deferred to Run 2** — achieving them requires a different enrichment strategy calibrated to the higher churn-risk and lower fill-rate baseline of small businesses. Run 1 precision/recall results will inform the confidence thresholds and fallback rules needed for Run 2.
+**PoC scope**: Parity targets are evaluated *per segment* in a single PoC pass (see Section 2b). Enterprise and mid-market targets are the realistic Phase 4 deliverable; micro and SMB targets are aspirational against the higher-churn, lower-fill baseline — the eval reports precision/recall per size band so the gap between aspiration and achievement is visible rather than hidden by deferral.
 
 ---
 
@@ -343,15 +358,13 @@ A state reaches **true parity** when both completeness AND correctness targets a
 
 **Observation**: 85.4% of records are micro/small businesses (<50 employees). Enterprise accounts (500+) are only 1.65% of the dataset (~68K records). For Sales Intelligence targeting mid-market and enterprise, the dataset has structural thin coverage at the top of the market — a genuine commercial gap worth flagging.
 
-**Run 1 scope**: **420,462 records (10.10% of US dataset)** covering size bands 51–200, 201–500, 501–1K, 1K–5K, 5K–10K, 10K+ (sum verified against valid-state population). Despite being a minority by record count, these represent the primary ICP for Sales Intelligence enterprise/mid-market products and have the highest data reliability in a 2023-vintage dataset. Micro/SMB (<51 employees, ~3.56M records) are the Run 2 scope.
-
-> _Earlier drafts of this section cited "~350K records (8.4% of dataset)" — that figure was derived from a different filter and is incorrect. The 420,462 number above is the authoritative count from the valid-state US population (4,163,774 records)._
+**PoC scope**: The Phase 4 sample spans all four size segments — enterprise (500+), mid-market (51–500), SMB (11–50), and churn-filtered micro (1–10) — with enterprise oversampled to ~20% of the 300-record sample despite being 1.65% of the population. The earlier "Run 1 = 51+ only, Run 2 = micro/SMB" framing was discarded; see Section 2b for the single-run rationale. A `HIGH_CHURN_RISK` pre-filter (Section 5b) excludes the highest-stale-entity-risk slice of micro (~5,718 records) without deferring the segment entirely.
 
 ---
 
 ## 5b. Data Reliability by Size Band (Vintage Adjustment)
 
-_Rationale for the Run 1 / Run 2 split — supporting evidence._
+_Vintage-reliability evidence — used in the PoC to justify the `HIGH_CHURN_RISK` pre-filter and per-segment eval reporting, not to defer micro/SMB to a second run._
 
 The dataset is 2023-vintage (~3 years old). Fill rates and average company age by size band show a clear monotonic gradient:
 
@@ -370,14 +383,14 @@ _Counts and rates below recomputed against the valid-state US population (4,163,
 
 **Vintage reliability interpretation**: Established firms with 51+ employees average 38–61 years old. The 3-year survival probability for firms this size exceeds 95%. Enriching a 2023-vintage record for a company that averaged 38+ years in age in 2023 is very likely to produce a still-accurate result in 2026. By contrast, micro businesses averaging 16 years of age in 2023 include a meaningful fraction of companies founded 2018–2022 — a cohort with 35–45% failure rates over a 5-year window. Enriching closed entities wastes tokens and pollutes the output file.
 
-**HIGH_CHURN_RISK flag** (defined for Run 2 pre-filter, not applied in Run 1):
+**HIGH_CHURN_RISK pre-filter** (applied in the Phase 4 PoC sample):
 ```sql
 size IN ('1-10')
 AND founded >= 2015
 AND website IS NULL
 AND type IS NULL
 ```
-Records matching all four criteria are high-probability stale entities. In Run 2, these will be skipped before the LLM enrichment pass and flagged in the output as `churn_risk = HIGH`.
+Records matching all four criteria are high-probability stale entities. Strict-match count is ~5,718 records — excluding them costs almost nothing and removes the slice most likely to waste tokens on closed companies. The remaining ~2.5M micro records stay in scope and are sampled normally; the PoC eval reports precision/recall per size band so the vintage gradient is visible in the results rather than hidden by deferral.
 
 ---
 
@@ -696,7 +709,7 @@ These sectors were ADEQUATE or MODERATE_GAP against SUSB alone, but are HIGH_GAP
 
 3. **Highest-priority states**: Iowa, Kansas, West Virginia, Mississippi, Arkansas (Tier B with worst avg fill). Tennessee and Oregon are the Tier A outliers worth targeting.
 
-4. **Run 1 scopes to 51+ employees (~350K records, 8.4% of dataset)**. Enterprise (500+) data is 92–99% filled and averages 52–61 years old — highly likely accurate in 2026. Mid-market (51–500) is 89–91% filled and 38–46 years old — reliable enough for Run 1. Micro/SMB data (<51 employees) is deferred to Run 2 using Run 1 precision/recall learnings to calibrate confidence thresholds and cost controls for the higher-churn-risk segment. Enterprise records are structurally thin (only 1.65% of total records at 500+) — a sourcing gap, not an enrichment issue.
+4. **PoC sample spans all four size segments in a single run** (~300 records → 288 after handle dedup). Enterprise (500+) is oversampled to 20% of the sample despite being 1.65% of the population — gives the eval statistical power on the primary ICP. Mid-market, SMB, and churn-filtered micro each contribute ~27% so the cascade is stress-tested across the full distribution, not just the easy half. The strict `HIGH_CHURN_RISK` filter (Section 5b) excludes ~5,718 highest-risk micro records as a pre-filter; the remaining micro population stays in scope. Per-segment precision/recall in the Phase 4 eval is the actionable signal — it tells us which size bands the cascade is trustworthy for, rather than deferring 85% of the dataset to a Run 2 that might never ship. Enterprise records are structurally thin in the source data (only 1.65% at 500+) — that's a sourcing gap, not an enrichment issue.
 
 5. **Physical economy sectors are structurally under-represented**: Construction (6.0%), Retail (6.3%), Transportation (2.0%), Other Services (2.3%), and Admin/Support (3.6%) are all HIGH_GAP when measured against the full SUSB+NES universe. These gaps reflect the source platform's professional/digital bias — they are sourcing gaps, not enrichment opportunities.
 
