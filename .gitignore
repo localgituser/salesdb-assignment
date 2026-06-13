@@ -11,3 +11,4 @@ venv/
 .claude/settings.local.json
 .claude/plans
 .claude/state
+.claude/settings.json

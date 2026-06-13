@@ -57,7 +57,23 @@ Inspection of the top invalid-state values shows the majority are malformed US s
 | Fl Florida | 129 | Redundant state prefix |
 | Flrida | 213 | Typo |
 
-These are **rules-fixable** — normalisation (case folding, whitespace trim, abbreviation lookup, city→state disambiguation) will recover the majority without any LLM calls. True foreign records (e.g., Ontario, Maharashtra, London) are a small fraction.
+These are **rules-fixable** — normalisation (case folding, whitespace trim, abbreviation lookup, city→state disambiguation) will recover the majority without any LLM calls.
+
+**Quantified breakdown** of the 45,169 non-null invalid-state records, after rule-based categorisation:
+
+| Category | Records | Distinct values | Notes |
+|---|---|---|---|
+| US recoverable — case mismatch | 10,495 | 1 | "District Of Columbia" → "District of Columbia" |
+| US recoverable — city leaked into state | 17,903 | 41 | "York", "Portland", "Marietta" — recombine with city field |
+| US recoverable — abbreviation variant | 2,087 | 47 | "D.C.", "N.Y.", "N.J." → expand |
+| US recoverable — redundant prefix | 2,155 | 143 | "Tx Texas", "Fl Florida" → strip prefix |
+| US recoverable — typo | 511 | 6 | "Flrida", "Califrnia", "Californie" |
+| US territory (excluded from gap rankings) | 355 | 5 | Puerto Rico (239), Virgin Islands (66), American Samoa (38) |
+| **Genuinely foreign** | **1,879** | **75** | Ontario, London, Maharashtra, Karnataka, Delhi, Gauteng, Dubai, etc. |
+| Junk | 165 | 2 | "Null", "Unknown" |
+| Unclassified (mostly city-like, smaller cities not in lookup) | 9,619 | 2,806 | Long tail; majority likely additional city leaks |
+
+**Foreign-record bound**: ≥1,879 confirmed foreign + an unknown sub-fraction of the 9,619 unclassified (estimated upper bound: ~3K–4K records total foreign). The non-recoverable residue after a full rules pass is therefore expected to be ~3K–4K records (~0.07%–0.10% of the US population) — small enough to drop without commercial impact.
 
 **Recommended fix** (add to `src/rules.py` before Phase 4):
 1. Case-fold + trim: catches "District Of Columbia" → "District of Columbia"
@@ -104,6 +120,12 @@ Within each state, records are stratified by **industry sector** (proportional t
 
 **Enterprise over-sampling**: Because 500+ employee records are only 1.65% of the dataset, naive proportional sampling would yield ~58 enterprise records across 3,550 — too thin for gap analysis. The audit sample targets a minimum of **50 enterprise records per Tier A state** and **20 per Tier B state**, drawn first before filling remaining quota proportionally. This ensures enterprise coverage gaps surface as first-class findings rather than statistical noise.
 
+**Verifier spot-check sample size (n=15 per gap)** — derivation: We want a sample large enough that, if a claimed gap is real at prevalence p ≥ 0.20 within the gap's slice, we will observe at least one positive case with high probability. Under a binomial model:
+
+> P(observe zero positives | n=15, p=0.20) = (1 − 0.20)^15 = 0.8^15 ≈ 0.0352
+
+So if the true within-slice prevalence is ≥ 20%, there is only a ~3.5% chance the 15-record spot-check sees zero hits — i.e., **~96.5% power to reject the "no gap" null at the 20% prevalence threshold**. For lower prevalence (p = 0.10), power drops to ~79% — acceptable for directional confirmation but not a guarantee. The 20% threshold is the operational floor for "structural" gaps in this audit; finer-grained gaps are flagged but not ranked.
+
 ### Phase 4 Enrichment PoC Sample (~300 records) — Two-Run Strategy
 
 The PoC runs in two passes. **Run 1 (this PoC) targets 51+ employee size bands exclusively.** Run 2 applies Run 1 learnings to micro/SMB (<51) in a separate pass.
@@ -137,6 +159,13 @@ The PoC runs in two passes. **Run 1 (this PoC) targets 51+ employee size bands e
 
 **Key finding**: `website` is the biggest gap (~910K missing). `industry` is the second largest actionable gap (~341K missing). `type` and `founded` are both majority-missing but have low commercial value for Sales Intelligence — not priority enrichment targets.
 
+**Reconciling three `website` missing counts cited in this document:**
+- **908,883** (Section 11.2): raw SQL count of `website IS NULL` on the valid-state US population (4,164,063 records). Authoritative "raw NULL" figure.
+- **~910K** (this section, rounded): same as above.
+- **~972K** (Section 6b): raw NULL + ~62,057 platform/social/builder URLs reclassified as effectively NULL per the blocklist. This is the **enrichment-relevant** count — the number of records that need a real website discovered, not just imputed.
+
+When sizing enrichment work, use **~972K**. When reporting raw fill rate as queried, use **908,883 / 21.83%**.
+
 ---
 
 ## 4. Fill Rates by State (Enrichment Opportunity Map)
@@ -163,7 +192,92 @@ Best-coverage states:
 
 **Observation**: `website` is consistently the lowest-filled field in every state — the gap range is 67–87%. It dominates the enrichment opportunity signal. `industry` has more variance by state (81% in Iowa vs. 96% in DC), suggesting Iowa/Kansas/West Virginia have both a website problem AND an industry classification gap. These are the highest-ROI enrichment targets in Tier B. Among Tier A states, Tennessee and Oregon stand out as below-average.
 
-**Coverage parity definition (size-stratified)**: Coverage targets must differ by company size — achieving 90% website fill on micro-businesses (<10 employees) is historically impossible and low-value; the same threshold on enterprise accounts is commercially unacceptable.
+### 4a. Full 51-state fill-rate table (worst → best by avg fill)
+
+_Generated from `data/processed/us_companies.parquet` on the 4,163,774-record valid-state population (50 states + DC). Avg fill = mean of website/industry/size fill percentages._
+
+| State | Tier | Records | Website % | Industry % | Size % | Avg Fill % |
+|---|---|---|---|---|---|---|
+| Iowa | B | 31,249 | 68.8 | 81.2 | 95.8 | 81.9 |
+| Kansas | B | 32,199 | 70.8 | 84.1 | 95.7 | 83.5 |
+| West Virginia | B | 10,569 | 67.2 | 89.7 | 94.5 | 83.8 |
+| Mississippi | B | 17,301 | 67.7 | 90.4 | 94.1 | 84.1 |
+| Arkansas | B | 23,429 | 70.5 | 90.3 | 94.1 | 85.0 |
+| Alaska | C | 9,245 | 69.8 | 89.6 | 96.7 | 85.4 |
+| Tennessee | A | 72,102 | 73.5 | 87.3 | 96.3 | 85.7 |
+| Oregon | A | 62,334 | 75.0 | 86.7 | 96.1 | 85.9 |
+| New Mexico | B | 17,978 | 72.4 | 91.1 | 94.8 | 86.1 |
+| Alabama | B | 39,190 | 73.6 | 90.6 | 94.1 | 86.1 |
+| Oklahoma | B | 35,484 | 73.6 | 90.8 | 94.3 | 86.2 |
+| South Dakota | C | 8,534 | 73.4 | 90.8 | 94.4 | 86.2 |
+| North Dakota | C | 7,517 | 73.8 | 90.6 | 94.5 | 86.3 |
+| Louisiana | B | 39,837 | 73.7 | 91.4 | 94.5 | 86.5 |
+| Kentucky | B | 32,080 | 75.5 | 89.9 | 94.3 | 86.6 |
+| Montana | B | 12,685 | 76.8 | 89.5 | 93.8 | 86.7 |
+| Ohio | A | 127,174 | 75.2 | 90.2 | 95.2 | 86.9 |
+| Nebraska | B | 20,478 | 75.7 | 90.7 | 95.1 | 87.2 |
+| Indiana | A | 67,249 | 78.3 | 91.3 | 92.6 | 87.4 |
+| South Carolina | B | 45,982 | 77.8 | 91.5 | 93.9 | 87.7 |
+| Michigan | A | 108,881 | 76.8 | 91.9 | 95.1 | 87.9 |
+| New Jersey | A | 124,155 | 75.6 | 92.8 | 95.4 | 87.9 |
+| Rhode Island | B | 14,198 | 76.3 | 92.3 | 95.2 | 87.9 |
+| Hawaii | B | 15,106 | 74.5 | 93.8 | 95.6 | 88.0 |
+| Missouri | A | 64,537 | 76.2 | 92.6 | 95.4 | 88.1 |
+| Wisconsin | A | 67,453 | 77.9 | 91.7 | 95.0 | 88.2 |
+| Minnesota | A | 75,049 | 78.4 | 91.3 | 95.3 | 88.3 |
+| Texas | A | 351,297 | 77.5 | 91.8 | 95.7 | 88.3 |
+| Idaho | B | 19,650 | 79.3 | 91.5 | 94.3 | 88.3 |
+| Connecticut | B | 48,191 | 78.2 | 91.9 | 94.9 | 88.3 |
+| Pennsylvania | A | 141,916 | 78.1 | 91.9 | 95.0 | 88.4 |
+| North Carolina | A | 115,134 | 78.0 | 92.6 | 94.7 | 88.5 |
+| Georgia | A | 133,221 | 77.8 | 91.9 | 95.8 | 88.5 |
+| New Hampshire | B | 20,572 | 79.4 | 91.8 | 94.8 | 88.7 |
+| Vermont | B | 10,225 | 80.1 | 91.1 | 95.1 | 88.8 |
+| Maine | B | 16,889 | 80.4 | 91.3 | 94.8 | 88.8 |
+| Virginia | A | 101,700 | 79.2 | 92.3 | 95.3 | 88.9 |
+| Nevada | B | 38,056 | 78.0 | 92.9 | 95.9 | 88.9 |
+| Illinois | A | 165,346 | 79.0 | 91.9 | 95.6 | 88.9 |
+| Washington | A | 104,783 | 78.7 | 92.4 | 95.7 | 89.0 |
+| Maryland | A | 71,005 | 80.2 | 92.3 | 95.1 | 89.2 |
+| California | A | 619,440 | 79.6 | 92.0 | 96.2 | 89.3 |
+| Florida | A | 306,228 | 80.3 | 92.1 | 95.6 | 89.3 |
+| Arizona | A | 80,683 | 80.5 | 92.1 | 95.7 | 89.4 |
+| New York | A | 309,011 | 78.9 | 93.5 | 96.1 | 89.5 |
+| Utah | B | 44,321 | 80.5 | 93.2 | 95.5 | 89.7 |
+| Colorado | A | 105,915 | 82.6 | 92.3 | 95.8 | 90.2 |
+| Wyoming | B | 11,424 | 81.1 | 93.8 | 96.1 | 90.3 |
+| Massachusetts | A | 129,657 | 81.9 | 94.1 | 95.8 | 90.6 |
+| Delaware | B | 20,061 | 84.5 | 94.3 | 95.8 | 91.6 |
+| District of Columbia | B | 17,054 | 86.7 | 95.6 | 93.7 | 92.0 |
+
+Tier C (Alaska, South Dakota, North Dakota) shown for completeness but excluded from ranked gap lists per the skill.
+
+### 4b. size × state cross-tab — website fill vs. parity targets
+
+_Tier A+B states (≥10K records). Mid-market = size bands 51-200 + 201-500. Enterprise = 501-1K + 1K-5K + 5K-10K + 10K+._
+
+**Finding**: All 48 Tier A+B states are below parity on website fill for BOTH mid-market (target ≥95%) AND enterprise (target ≥99%). Best mid-market is Delaware at 93.3%; best enterprise is Vermont at 97.9%. The parity targets in the table below are aspirational ceilings — no US state currently clears them on `website`.
+
+Worst 10 states on mid-market website fill (the Phase 4 Run 1 priority slice):
+
+| State | Mid-market n | Mid-market website % | Enterprise n | Enterprise website % |
+|---|---|---|---|---|
+| Mississippi | 1,463 | 82.0 | 304 | 89.5 |
+| West Virginia | 949 | 83.2 | 160 | 85.0 |
+| Arkansas | 1,779 | 84.5 | 355 | 90.4 |
+| New Mexico | 1,209 | 85.7 | 187 | 94.7 |
+| Alabama | 3,453 | 86.1 | 674 | 92.7 |
+| Oklahoma | 3,106 | 86.3 | 559 | 92.1 |
+| Louisiana | 3,699 | 86.4 | 622 | 88.7 |
+| Tennessee | 5,691 | 87.5 | 1,281 | 92.2 |
+| Kentucky | 3,042 | 87.6 | 604 | 91.7 |
+| Hawaii | 1,076 | 87.6 | 188 | 92.0 |
+
+**Implication for Phase 4 Run 1 batch composition**: target the mid-market slices in Mississippi, West Virginia, Arkansas, New Mexico, Alabama, Oklahoma, and Louisiana first — they have the largest parity gap and a meaningful absolute record count (≥950 per state). Iowa and Kansas (worst overall avg fill in §4) are dominated by their micro/SMB cohorts; their mid-market populations are mid-pack on website fill.
+
+### 4c. Coverage parity definition (size-stratified)
+
+Coverage targets must differ by company size — achieving 90% website fill on micro-businesses (<10 employees) is historically impossible and low-value; the same threshold on enterprise accounts is commercially unacceptable.
 
 | Size Band | Website Fill Target | Industry Fill Target | Size Fill Target |
 |---|---|---|---|
@@ -175,6 +289,22 @@ Best-coverage states:
 A state reaches overall coverage parity when all four size bands meet their respective thresholds. For gap-ranking purposes (Phase 2), **enterprise and mid-market gaps are weighted 3× vs. micro-business gaps** — a single enterprise record with missing website is worth three micro-business completions for Sales Intelligence ROI.
 
 The flat aggregate thresholds (website ≥ 90%, industry ≥ 95%, size ≥ 97%) from best-covered Tier A states remain useful as a simple summary signal but should not be used for enrichment prioritisation decisions.
+
+**Accuracy standard (the brief asks "at what accuracy", not just fill rate)**: Fill rate alone is incomplete — a website field populated with a wrong URL meets a fill-rate threshold but fails commercially. Coverage parity in this submission therefore has two dimensions:
+
+| Dimension | What's measured | Measurement point |
+|---|---|---|
+| Completeness | % of records with a non-null value (after platform-URL reclassification per §6b) | Phase 1 (this document) |
+| Correctness | Precision against ground truth: enriched values that match human-labelled answers | Phase 4 eval (`evals/ground_truth.json`, n=20–25 hand-labelled) |
+
+Targets per field:
+- **Website correctness**: ≥ 90% precision (a populated URL must resolve to the company's own domain, not a platform/social URL, not a 404, not a wrong company)
+- **Industry correctness**: ≥ 85% precision against the canonical-merged taxonomy (semantic-duplicate pairs from §6b counted as correct if either label appears)
+- **Size correctness**: ≥ 95% precision (size is enum-bounded; misclassification is the main failure mode)
+
+A state reaches **true parity** when both completeness AND correctness targets are met. The phase-1 baseline cannot measure correctness without ground truth — only Phase 4's eval can. Completeness is the necessary-but-not-sufficient gate.
+
+**State-tier variant on completeness**: Tier A states are held to the full size-band table above. Tier B states are scored *directionally* — they meet parity if they are within 5 percentage points of the Tier A target (e.g., Tier B enterprise website ≥ 94% rather than ≥ 99%) given thinner record counts. Tier C is excluded from parity scoring entirely.
 
 **Run 1 / Run 2 scope**: Parity targets for enterprise (500+) and mid-market (51–500) bands are the Phase 4 Run 1 goal. Micro (<11) and SMB (11–50) parity targets are **deferred to Run 2** — achieving them requires a different enrichment strategy calibrated to the higher churn-risk and lower fill-rate baseline of small businesses. Run 1 precision/recall results will inform the confidence thresholds and fallback rules needed for Run 2.
 
@@ -213,7 +343,9 @@ The flat aggregate thresholds (website ≥ 90%, industry ≥ 95%, size ≥ 97%) 
 
 **Observation**: 85.4% of records are micro/small businesses (<50 employees). Enterprise accounts (500+) are only 1.65% of the dataset (~68K records). For Sales Intelligence targeting mid-market and enterprise, the dataset has structural thin coverage at the top of the market — a genuine commercial gap worth flagging.
 
-**Run 1 scope**: ~350K records (8.4% of dataset) covering size bands 51–200, 201–500, 501–1K, 1K–5K, 5K–10K, 10K+. Despite being a minority by record count, these represent the primary ICP for Sales Intelligence enterprise/mid-market products and have the highest data reliability in a 2023-vintage dataset. Micro/SMB (<51 employees, 3.5M records) are the Run 2 scope.
+**Run 1 scope**: **420,462 records (10.10% of US dataset)** covering size bands 51–200, 201–500, 501–1K, 1K–5K, 5K–10K, 10K+ (sum verified against valid-state population). Despite being a minority by record count, these represent the primary ICP for Sales Intelligence enterprise/mid-market products and have the highest data reliability in a 2023-vintage dataset. Micro/SMB (<51 employees, ~3.56M records) are the Run 2 scope.
+
+> _Earlier drafts of this section cited "~350K records (8.4% of dataset)" — that figure was derived from a different filter and is incorrect. The 420,462 number above is the authoritative count from the valid-state US population (4,163,774 records)._
 
 ---
 
@@ -223,16 +355,18 @@ _Rationale for the Run 1 / Run 2 split — supporting evidence._
 
 The dataset is 2023-vintage (~3 years old). Fill rates and average company age by size band show a clear monotonic gradient:
 
-| Size Band | Records | Website Fill | Industry Fill | Type=NULL % | Avg Company Age |
+_Counts and rates below recomputed against the valid-state US population (4,163,774 records). Earlier draft of this table had count-column estimates (232K / 64K / 24K / 22K / 4.4K / 7.4K) that did not reconcile with §5 — those have been replaced with the authoritative figures from the same query as §5. Avg age uses a 2026-vintage baseline (2026 − founded) for established firms; the dataset itself is 2023-collected._
+
+| Size Band | Records | Website Fill | Industry Fill | Type=NULL % | Avg Company Age (2026 baseline) |
 |---|---|---|---|---|---|
-| 1–10 (micro) | 2.49M | 75.8% | 93.1% | 47.2% | ~16 years |
-| 11–50 | 1.07M | 81.1% | 94.9% | 43.0% | ~26 years |
-| 51–200 | 232K | 89.6% | 97.7% | 18.1% | ~38 years |
-| 201–500 | 64K | 90.9% | 98.6% | 11.9% | ~46 years |
-| 500–1K | 24K | 92.6% | 99.2% | 7.9% | ~53 years |
-| 1K–5K | 22K | 92.8% | 99.3% | 8.1% | ~57 years |
-| 5K–10K | 4.4K | 92.1% | 99.1% | 6.4% | ~63 years |
-| 10K+ | 7.4K | 92.2% | 99.6% | 4.6% | ~61 years |
+| 1–10 (micro) | 2,490,725 | 75.3% | 92.9% | 47.2% | ~13 years (2023 base) / ~16 (2026) |
+| 11–50 | 1,064,962 | 80.6% | 94.7% | 43.0% | ~23 / ~26 |
+| 51–200 | 275,757 | 89.3% | 97.5% | 18.1% | ~35 / ~38 |
+| 201–500 | 76,063 | 90.7% | 98.5% | 11.9% | ~42 / ~45 |
+| 501–1K | 28,851 | 92.6% | 99.2% | 7.9% | ~48 / ~51 |
+| 1K–5K | 26,114 | 92.7% | 99.3% | 8.1% | ~52 / ~55 |
+| 5K–10K | 5,219 | 92.2% | 99.2% | 6.4% | ~57 / ~60 |
+| 10K+ | 8,458 | 92.3% | 99.6% | 4.6% | ~52 / ~55 |
 
 **Vintage reliability interpretation**: Established firms with 51+ employees average 38–61 years old. The 3-year survival probability for firms this size exceeds 95%. Enriching a 2023-vintage record for a company that averaged 38+ years in age in 2023 is very likely to produce a still-accurate result in 2026. By contrast, micro businesses averaging 16 years of age in 2023 include a meaningful fraction of companies founded 2018–2022 — a cohort with 35–45% failure rates over a 5-year window. Enriching closed entities wastes tokens and pollutes the output file.
 
@@ -312,7 +446,18 @@ These records are not missing (`website IS NOT NULL`) and would pass a simple fi
 
 **Note on website-builder platforms**: `wixsite.com` stored without a subdomain means the company's actual URL (`companyname.wixsite.com/page`) was truncated to the platform root. The same applies to weebly.com, wordpress.com, etc. These are not valid company websites as stored.
 
-**Franchise/chain shared domains** (separate pattern — not blocked, but flagged): `marriott.com` (616), `hilton.com` (486), `expresspros.com` (496), `kw.com` (252). These represent multiple franchise locations all using the parent brand domain. Technically valid as a proxy website, but misleading for unique company identification. Flag for review, do not null out.
+**Cardinality-explosion check (>0.1% threshold)**: The platform/social URLs above qualify by an order of magnitude — `yelp.com` at 13,151 records is 0.32% of US records; `facebook.com` at 0.26%; `linktr.ee` at 0.18%. All 13 platform/social domains exceed the 0.1% anomalous-frequency threshold and are correctly captured by the blocklist above.
+
+**Franchise/chain shared domains — full ≥50-records pass**: 383 distinct domains appear on ≥50 distinct `handle` records, covering 101,391 records total. Categorised:
+
+| Category | Distinct domains | Records |
+|---|---|---|
+| Platform/social (already in blocklist) | 13 | 47,967 |
+| Website builder (already in blocklist) | 10 | 11,605 |
+| Institutional (.edu/.mil/.gov, already in blocklist) | 168 | 19,841 |
+| **True franchise / chain shared domain** | **192** | **21,978** |
+
+Top 10 true franchise/chain by record count: `thetopperson.com` (641), `marriott.com` (621), `expresspros.com` (499), `hilton.com` (495), `schoolloop.com` (328), `myshopify.com` (327), `meetup.com` (309), `hyatt.com` (306), `substack.com` (305), `vpweb.com` (281). Hotels, real estate brokerages (`kw.com` = Keller Williams), franchise services, and shared community platforms dominate. These are technically valid as proxy websites but misleading for unique company identification — flag with `has_shared_domain = true` in `src/rules.py`; do not null out.
 
 **Placeholder strings**: ~90 records store partial URL strings (`www`, `com`, `http`, `https`) with no domain — rules-fixable via regex.
 
@@ -340,9 +485,11 @@ These records are not missing (`website IS NOT NULL`) and would pass a simple fi
 
 **Finding: no typos, but 3 semantic duplicate label pairs covering ~329K records.**
 
-String-similarity near-duplicates (ratio > 0.85) were all inspected and confirmed to be legitimately different sectors (e.g., `residential building construction` vs `nonresidential building construction`). No spelling errors found.
+**Cardinality trend check (label-explosion threshold = 500 distinct values)**: 491 distinct values — **below the 500 threshold**, so this check **clears with `no_action_needed`**. Stating this explicitly so it appears in the profiling JSON summary.
 
-However, three label pairs describe the same concept using different wording — a LinkedIn taxonomy inconsistency, not a data entry error:
+**String-similarity check (token sort ratio ≥ 0.85)**: All pairs above the 0.85 threshold were inspected (the threshold yielded 12 pairs; manual review confirmed all 12 are legitimately different sectors — e.g., `residential building construction` vs `nonresidential building construction`). No spelling errors found via this check.
+
+**Taxonomy-inconsistency check** (subset/abbreviation pattern — distinct from the similarity check): three label pairs describe the same concept using different wording — a LinkedIn taxonomy inconsistency, not a data entry error. These were found via the subset-pattern check, not the 0.85 string-similarity check:
 
 | Label A | Records | Label B | Records | Combined | Recommended Canonical |
 |---|---|---|---|---|---|
