@@ -558,3 +558,300 @@ These sectors were ADEQUATE or MODERATE_GAP against SUSB alone, but are HIGH_GAP
 7. **Rules cleanup first**: Short/garbage names, malformed URLs, suspicious founding years, and invalid state values — clear these with `src/rules.py` before running any LLM passes to avoid wasting tokens on non-entities. Invalid/null state records are 3.32% overall but reach 7.2% of large enterprises (10K+); most are recoverable via case normalisation and abbreviation expansion (see Section 1b).
 
 8. **Safe merge key established**: `handle` is the anchor for all enrichment writes.
+
+---
+
+## 11. Extended Profiling Audit
+
+_Generated: 2026-06-12 | Script: ad-hoc DuckDB queries | Dataset: data/processed/us_companies.parquet | Scope: 4,164,063 US records_
+
+---
+
+### 11.1 Cross-Field Consistency Checks
+
+#### 11.1a City/State Coherence
+
+The top 20 most-frequent (city, state) pairs were queried and verified against known US geography:
+
+| City | State | Count | Verdict |
+|---|---|---|---|
+| New York | New York | 120,391 | Valid |
+| Los Angeles | California | 81,103 | Valid |
+| Houston | Texas | 58,812 | Valid |
+| Chicago | Illinois | 56,633 | Valid |
+| San Francisco | California | 51,587 | Valid |
+| Miami | Florida | 40,301 | Valid |
+| Atlanta | Georgia | 39,659 | Valid |
+| Austin | Texas | 38,831 | Valid |
+| Dallas | Texas | 37,613 | Valid |
+| San Diego | California | 33,203 | Valid |
+| Seattle | Washington | 30,709 | Valid |
+| Denver | Colorado | 28,481 | Valid |
+| Las Vegas | Nevada | 23,086 | Valid |
+| Phoenix | Arizona | 22,950 | Valid |
+| Boston | Massachusetts | 22,782 | Valid |
+| Portland | Oregon | 21,789 | Valid |
+| Philadelphia | Pennsylvania | 20,542 | Valid |
+| Orlando | Florida | 19,645 | Valid |
+| Charlotte | North Carolina | 18,896 | Valid |
+| Tampa | Florida | 18,570 | Valid |
+
+**Finding: 0 impossible city/state pairs in the top 20.** All top-20 (city, state) combinations are geographically coherent. The city/state field-split artifact ("New" + "York") identified in Section 6b is not surfacing in the top-20 because those split records have been captured separately under state='York' in Section 1b — they do not appear in the valid-state-filtered dataset used here.
+
+**Fix classification**: `no_action_needed` for top-20. The split-artifact records (14,114) already flagged in Section 6b under `city` should be addressed by the rules already specified there.
+
+---
+
+#### 11.1b Size vs. Founded Year Plausibility
+
+**Finding: 231 records have `size = '10K+'` AND `founded >= 2021`** — companies that large in under 5 years as of 2026.
+
+Count: **231** (0.006% of US records; 2.73% of all 10K+ records)
+
+Top 10 examples:
+
+| Handle | Name | Founded | Size |
+|---|---|---|---|
+| company/sccpconference | Consciousness: Science, Spirituality & Social Impact | 2023 | 10K+ |
+| company/salesforce-qa-engineer | Salesforce QA Engineer | 2023 | 10K+ |
+| company/generative-ai-crm | Generative AI CRM | 2023 | 10K+ |
+| company/acostagrp | Acosta Group | 2023 | 10K+ |
+| company/beagambler | Be A Gambler | 2023 | 10K+ |
+| company/infinite-group-worldwide | INFINITE GROUP | 2023 | 10K+ |
+| company/kia-veterans-technician-apprenticeship-program-vtap | KIA Veterans Technician Apprenticeship Program (VTAP) | 2023 | 10K+ |
+| company/mays-cmc | Career Management Center - Texas A&M University Mays Business School | 2023 | 10K+ |
+| company/fearless-founders | Fearless Founders AI | 2023 | 10K+ |
+| company/neltify | Neltify | 2023 | 10K+ |
+
+**Interpretation**: The examples reveal two distinct root causes. "Acosta Group" is a legitimate large company that rebranded/reorganized in 2023 and may have updated its LinkedIn `founded` year to reflect the restructuring rather than the original entity's founding. "Salesforce QA Engineer" and "Generative AI CRM" are clearly not independent companies — they are likely job posting pages or LinkedIn profile artifacts that were ingested as company records. "Consciousness: Science, Spirituality & Social Impact" and "Fearless Founders AI" are likely community pages or micro-events misclassified as 10K+ organizations. The `size` field for these records is almost certainly scraped from follower counts or event attendance, not actual employee headcount.
+
+**Fix classification**: `flag_only` — these 231 records should be tagged `implausible_size_founded = true` in `src/rules.py`. Do not null out `size` or `founded` without manual verification; the root cause is ambiguous (rebranding vs. phantom record).
+
+---
+
+#### 11.1c Website vs. Entity Type Consistency
+
+Records where `type IN ('Nonprofit', 'Government Agency')` AND `website IS NOT NULL` AND the website does not end in `.org`, `.gov`, `.mil`, or `.edu`:
+
+| Type | Non-mission-TLD count | Total with website | Non-mission % |
+|---|---|---|---|
+| Nonprofit | 67,497 | 231,951 | 29.1% |
+| Government Agency | 9,194 | 21,519 | 42.7% |
+| **Total** | **76,691** | **253,470** | **30.3%** |
+
+Top 5 examples:
+
+| Handle | Name | Type | Website |
+|---|---|---|---|
+| company/100peoplemacomb | 100 People Macomb | Nonprofit | 100peoplemacomb.com |
+| company/2020wonvision | 2020WonVision | Nonprofit | 2020wonvision.com |
+| company/3-steps-2-start-up | 3 Steps 2 Start Up | Nonprofit | 3steps2startup.com |
+| company/4justiceemory | 4 Justice Emory | Nonprofit | instagram.com |
+| company/a-better-chance-a-better-community | A BETTER CHANCE A BETTER COMMUNITY | Nonprofit | abc-2.net |
+
+**Interpretation**: This is predominantly a **data quality signal, not an error pattern**. Many legitimate US nonprofits register `.com` domains (especially smaller community organizations). The 29.1% non-.org rate for nonprofits reflects reality — the IRS does not require `.org` registration for 501(c)(3) status. However, the 42.7% rate for Government Agency entities with `.com` websites is more concerning: legitimate federal, state, and local government agencies almost always use `.gov` or `.mil` domains. A `.com` website for a "Government Agency"-typed entity strongly suggests either a miscategorized record (e.g., a government contractor labeled as the agency itself) or a platform/social URL artifact (the `instagram.com` example above confirms this).
+
+**Fix classification**: `flag_only` — flag `type = 'Government Agency'` AND `website` not ending in `.gov`/`.mil`/`.edu` (9,194 records) for manual spot-check. Nonprofits with `.com` (67,497) are low-priority given domain choice is arbitrary for nonprofits.
+
+---
+
+#### 11.1d Domain vs. Website Redundancy
+
+**Finding: No `domain` column exists in the dataset.** The schema contains only `handle`, `name`, `website`, `industry`, `size`, `type`, `founded`, `city`, `state`, and `country_code`. There is no separate `domain` field to compare against.
+
+**Fix classification**: `no_action_needed`.
+
+---
+
+### 11.2 Null Pattern Analysis (MCAR / MAR / MNAR)
+
+**National null rates (baseline):**
+
+| Field | Null Count | Null Rate |
+|---|---|---|
+| `website` | 908,883 | 21.83% |
+| `industry` | 341,161 | 8.19% |
+| `size` | 187,625 | 4.51% |
+| `type` | 1,877,900 | 45.10% |
+
+#### Null rates by state tier
+
+| Tier | Records | website null % | industry null % | size null % | type null % |
+|---|---|---|---|---|---|
+| A (≥50K records) | 3,504,270 | 21.39% | 8.00% | 4.38% | 44.01% |
+| B (10K–49,999) | 634,208 | 24.00% | 9.20% | 5.18% | 50.50% |
+| C (<10K) | 25,296 | 27.81% | 9.67% | 4.74% | 61.43% |
+
+#### Null rates by size band (website and industry)
+
+| Size Band | Records | website null % | industry null % |
+|---|---|---|---|
+| 1–10 | 2,490,725 | 24.73% | 7.06% |
+| 11–50 | 1,064,962 | 19.43% | 5.34% |
+| 51–200 | 275,757 | 10.69% | 2.52% |
+| 201–500 | 76,063 | 9.29% | 1.50% |
+| 501–1K | 28,851 | 7.43% | 0.83% |
+| 1K–5K | 26,114 | 7.28% | 0.69% |
+| 5K–10K | 5,219 | 7.78% | 0.84% |
+| 10K+ | 8,458 | 7.74% | 0.35% |
+| NULL size | 187,625 | 23.71% | 53.22% |
+
+#### Website null rate by state: top 5 and bottom 5 by record count
+
+Top 5 states by record count (Tier A):
+
+| State | Records | website null % | vs. national 21.83% |
+|---|---|---|---|
+| California | 619,440 | 20.38% | -1.45 pp |
+| Texas | 351,297 | 22.54% | +0.71 pp |
+| New York | 309,011 | 21.14% | -0.69 pp |
+| Florida | 306,228 | 19.71% | -2.12 pp |
+| Illinois | 165,346 | 20.96% | -0.87 pp |
+
+Bottom 5 states by record count (Tier B/C):
+
+| State | Records | website null % | vs. national 21.83% |
+|---|---|---|---|
+| North Dakota | 7,517 | 26.25% | +4.42 pp |
+| South Dakota | 8,534 | 26.63% | +4.80 pp |
+| Alaska | 9,245 | 30.18% | +8.35 pp |
+| Vermont | 10,225 | 19.94% | -1.89 pp |
+| West Virginia | 10,569 | 32.84% | +11.01 pp |
+
+#### Null pattern classification per field
+
+**`website` — MAR (Missing At Random given observed data)**
+
+Evidence: The null rate varies substantially and systematically across both state tier and company size. West Virginia: 32.84% vs. national 21.83% (+11 pp); Alaska: 30.18% (+8.35 pp); Florida: 19.71% (-2.12 pp). The gradient across size bands is even stronger: micro businesses (1–10 employees) have a 24.73% null rate vs. 7.43% for mid-market (501–1K) — a 17.3 pp spread. This is consistent with MAR: whether a website is missing is predictable from observable covariates (state, company size). Enrichment should be stratified — do not apply a uniform model across all states and sizes. The high null rate in agricultural/rural states (West Virginia, Mississippi, Iowa) likely reflects structural differences in small business web presence, not random data collection failures.
+
+**`industry` — MAR (Missing At Random given observed data), with MNAR characteristics**
+
+Evidence: Null rate varies by size band: 7.06% for micro vs. 0.35% for 10K+ — a 20× gradient. Crucially, the `size=NULL` cohort has a 53.22% industry null rate (vs. 8.19% national), indicating that the two missingness patterns are correlated. Records missing both `size` and `industry` are likely the lowest-quality scrapes where the source profile had minimal data. This has MNAR characteristics: the kind of company that lacks an industry label is specifically the kind that would not have had one — informal businesses, stubs, and placeholder profiles. Enrichment will be harder for this cohort since there is no anchor field to infer from.
+
+**`size` — MAR (Missing At Random given observed data)**
+
+Evidence: Null rate varies by tier (Tier A: 4.38%, Tier C: 4.74%) but the spread is narrow (< 1 pp across tiers). The dominant correlation is the extreme null rate in the `size=NULL` cohort itself is tautological — the interesting finding is the `industry=NULL` correlation (53.22% of size-null records also lack industry). Size missingness appears uniformly distributed across states but correlated with record quality (same low-quality scrapes that miss industry also miss size). Enrichment can be applied relatively uniformly across states; the sub-population requiring attention is the doubly-null (size AND industry NULL) cohort.
+
+**`type` — MNAR (Missing Not At Random)**
+
+Evidence: The null rate follows an almost perfectly monotonic gradient: micro businesses (1–10 employees) have a 47.21% type null rate, enterprise (10K+) has 4.55%. Tier A: 44.01%, Tier B: 50.50%, Tier C: 61.43%. The `type` field in this dataset appears to reflect how often LinkedIn users (or data vendors) bother to classify organizational type — larger, more professionally curated company pages almost always have a type value; small/informal businesses almost never do. This is structurally MNAR: the companies that don't have a `type` value are specifically those that are less likely to have one (informal sole proprietors, hobby businesses, stub pages). Enrichment is structurally harder — rules cannot derive type from other fields, and LLM inference from name alone would be low-precision.
+
+---
+
+### 11.3 `founded` Round-Number Check
+
+**Non-null `founded` records: 2,001,208**
+
+#### Multiples of 1000 (primary check)
+
+| Value | Count | % of non-null |
+|---|---|---|
+| 2000 | 29,320 | 1.465% |
+| **Total mult-of-1000** | **29,320** | **1.465%** |
+
+**Finding: 1.465% of non-null `founded` values are exact multiples of 1000** — well below the 5% flag threshold. Only the year 2000 qualifies (not 1000, 3000, etc.), and the context confirms it is a genuine year: `founded=2000` records have 91.2% website fill and 96.9% industry fill, nearly identical to `founded=2001` controls (92.3% and 97.1% respectively). The 2000 peak is also plausibly explained by the dot-com era founding spike — not placeholder inflation.
+
+**Finding: 0.041% are multiples of 100 but not 1000** (828 records). The top values are 1900 (766), 1800 (53), and smaller counts for earlier century marks. These are ambiguous: some are likely genuine century-mark founding years (e.g., a company founded in 1900), while others are probably rounding artifacts. The total (828) is too small to act on without manual review.
+
+#### Decade mark clustering (secondary signal)
+
+Among records with `founded` between 1950 and 2024, 12.35% fall on decade marks (multiples of 10), versus an expected 10% if uniform. Multiples of 5: 21.24% vs. expected 20%. Both ratios are within ~2.5% of their expected values — consistent with mild human rounding bias (preferring round years when exact founding dates are unknown) but not a systematic placeholder-injection pattern.
+
+**Fix classification**: `no_action_needed` — neither the mult-of-1000 rate (1.47%) nor the decade clustering (12.35% vs. 10% expected) exceeds the 5% threshold or exhibits an anomalous distribution pattern. The pre-1800 junk years (1,357 records) identified in Section 6b remain the actionable issue; this check adds no new cleaning requirements.
+
+---
+
+### 11.4 `name` Encoding Artifacts
+
+All counts below are scoped to US state records (4,164,063).
+
+#### 11.4a Unicode Replacement Character (U+FFFD)
+
+**Count: 10 records** (0.0002% of US records)
+
+Top 5 examples:
+
+| Handle | Name |
+|---|---|
+| company/proflex-products-inc | PROFLEX▯▯ Products Inc |
+| company/arête-custom-builds | Ar▯▯te Custom Builds |
+| company/trured | TRU RED▯▯ |
+| company/gezzo's-surf-&-grille | Gezzo▯▯▯s Surf & Grille |
+| company/manyuses | ManyUses▯▯ |
+
+**Interpretation**: Replacement characters indicate UTF-8 decoding failures during ingestion — likely caused by special characters (accented letters, typographic quotes, trademark symbols) in the source data that were not correctly decoded. The pattern `Ar▯▯te` is almost certainly `Arête` (the word "arête") and `Gezzo▯▯▯s` is `Gezzo's` (typographic apostrophe → three-byte sequence decoded as replacement chars).
+
+**Fix classification**: `rules_fixable` — the 10 affected records can be individually reviewed and corrected. A general fix would attempt re-encoding from the original source (if available) or fuzzy-match the handle URL (which correctly shows `arête-custom-builds`) to reconstruct the intended name.
+
+#### 11.4b High Special Character Ratio (>30% non-alphanumeric excluding spaces)
+
+**Count: 4,006 US records** (0.096% of US records)
+
+Top 5 examples (mixed Latin + special chars):
+
+| Handle | Name | Special % |
+|---|---|---|
+| company/jamit-news | --------------------------x | 96.3% |
+| company/adriennearagon | ᴀᴇꜱᴛʜᴇᴛᴇ \| ʙy ᴀᴅʀɪᴇɴɴᴇ ᴀʀᴀɢᴏɴ | 96.0% |
+| company/familia-español | 𝓕𝓪𝓶𝓲𝓵𝓲𝓪 𝓔𝓼𝓹𝓪n𝓸𝓵® 𝓒𝓪𝓽𝓮𝓻𝓲𝓷𝓰 | 95.7% |
+| company/learn-english-academy | أكاديمية تعلم اللغة الإنجليزية - LEA | 90.3% |
+| company/jejwd | 西[CJK+control chars] | 89.7% |
+
+**Interpretation**: This cohort contains three distinct sub-patterns: (1) separator/spacer strings (`--------------------------x`) that are garbage names, (2) names using Unicode typographic letterforms (mathematical bold `𝗥𝗘𝗫𝗢𝗣𝗔𝗞`, script `𝓕𝓪𝓶𝓲𝓵𝓲𝓪`) that are real company names stored in decorative Unicode — these will break search indexes and string comparisons, and (3) foreign-language names (Arabic, CJK) that appear in US state records due to diaspora/immigrant businesses. The decorative-Unicode sub-pattern (8 records with 4-byte codepoints) should be normalized to plain ASCII equivalents.
+
+**Fix classification**: `rules_fixable` for the garbage/separator names (overlaps with Section 6b short-name filter); `flag_only` for the decorative-Unicode names (8 records) — rules can strip to ASCII but may lose meaningful characters; `no_action_needed` for legitimate foreign-language names of US businesses.
+
+#### 11.4c Mixed-Script and Foreign-Script Names
+
+| Pattern | US Records | % of US Records |
+|---|---|---|
+| CJK characters (U+4E00–U+9FFF) | 316 | 0.0076% |
+| Arabic characters (U+0600–U+06FF) | 302 | 0.0073% |
+| Mixed Latin + CJK | 330 | 0.0079% |
+
+Top 5 CJK examples:
+
+| Handle | Name | State |
+|---|---|---|
+| company/calchina2020 | 2020加州中美峰会 California China-US Summit | California |
+| company/casela-technologies | Casela Technologies 镭芯光电 | California |
+| company/ospa-overseas-students-philanthropy-actions | OSPA (Overseas Students Philanthropy Actions)留学生公益在行动 | Maryland |
+| company/spice-workshop-椒房 | Spice workshop 椒房 | New York |
+| company/superus-health | Superus Health 至尚健康 | (not shown) |
+
+Top 5 Arabic examples:
+
+| Handle | Name | State |
+|---|---|---|
+| company/maawanamaa | Maawanamaa - ماء ونماء | Massachusetts |
+| company/شبكة-ومنتديات-العمري-1 | شبكة ومنتديات العمري | New York |
+| company/beati-بيئتي | Be'ati بيئتي | Massachusetts |
+| company/wassmacapital | Wassma \| وسما | (null state) |
+| company/lawelitefirm | نخبة القانون | (null state) |
+
+**Interpretation**: CJK and Arabic names in US state records are predominantly legitimate businesses serving immigrant communities or operating bilingually. The mixed Latin+CJK pattern (330 records) is expected for US-based Chinese-American businesses that use both scripts on their LinkedIn profiles. Pure Arabic names (302 records) similarly reflect US-based Arabic-speaking businesses. These are not data quality errors — they are valid company names. The issue is operational: these names will not sort correctly in ASCII-first indexes and may cause display issues in downstream systems.
+
+**Fix classification**: `flag_only` — tag records with CJK or Arabic characters as `has_non_latin_name = true` in rules.py so downstream consumers can handle them appropriately. Do not null out or modify the names.
+
+---
+
+### 11. Summary Table
+
+| Field | Issue | Count | % of US Records | Fix |
+|---|---|---|---|---|
+| `city`/`state` | Impossible city/state pairs in top 20 | 0 | 0% | no_action_needed |
+| `size`/`founded` | 10K+ companies founded ≥ 2021 | 231 | 0.006% | flag_only |
+| `type`/`website` | Gov Agency with non-.gov/.mil/.edu website | 9,194 | 0.22% | flag_only |
+| `type`/`website` | Nonprofit with non-.org/.gov website | 67,497 | 1.62% | flag_only |
+| `domain` | No `domain` column exists | N/A | — | no_action_needed |
+| `website` | Null rate (national) | 908,883 | 21.83% | MAR — stratified enrichment |
+| `industry` | Null rate (national) | 341,161 | 8.19% | MAR/MNAR — stratified enrichment |
+| `size` | Null rate (national) | 187,625 | 4.51% | MAR — uniform enrichment viable |
+| `type` | Null rate (national) | 1,877,900 | 45.10% | MNAR — structurally hard |
+| `founded` | Multiples of 1000 (year 2000 only) | 29,320 | 0.70% | no_action_needed (below 5% threshold) |
+| `founded` | Multiples of 100 (not 1000) | 828 | 0.02% | no_action_needed |
+| `name` | Unicode replacement character (U+FFFD) | 10 | 0.0002% | rules_fixable |
+| `name` | >30% non-alphanumeric characters | 4,006 | 0.096% | rules_fixable (garbage) / flag_only (decorative unicode) |
+| `name` | Decorative 4-byte Unicode letterforms | 8 | 0.0002% | flag_only |
+| `name` | CJK characters (US records) | 316 | 0.008% | flag_only |
+| `name` | Arabic characters (US records) | 302 | 0.007% | flag_only |
