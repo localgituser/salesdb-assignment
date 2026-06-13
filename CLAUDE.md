@@ -13,7 +13,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Phase 4**: PoC Enrichment Pipeline (cascade: rules → search → Haiku verify → Sonnet fallback)
 - **Phase 5**: Reusable Skill documentation
 
-**Key constraint**: Hard $10 total LLM budget across all phases. Cost must be logged and checked per phase.
+**Project parameters**: All tunable parameters (budget caps, gap-tier thresholds, geography tier cutoffs, platform blocklist, run scope, market dataset/comparator paths) live in `config/project.yaml` and are loaded via `src/config.py` (`CONFIG`). To run this project against a new market, edit that YAML — no code changes required. **Never hardcode these values elsewhere.**
+
+**Self-imposed budget ceiling**: $10 total — chosen as a discipline constraint, not a brief requirement. Cost is logged and checked per phase. See `config/project.yaml` → `budget` for the authoritative split.
 
 **Note on Phase 6**: The 90-Day Pod Plan is a Notion deliverable, not a code phase — no script in `src/` corresponds to it. It's written last, informed by outputs from Phases 1-4.
 
@@ -39,7 +41,7 @@ This project uses three subagents defined in `.claude/agents/`:
 
 **Phase 3 (commercial framing) and Phase 5 (SKILL.md) are not delegated to subagents** — they are manual/Claude tasks with $0 LLM budget.
 
-**Coverage audit workflow**: When running Phase 1 (data-profiler) or Phase 2 (data-engineer), consult `.claude/skills/coverage-audit/SKILL.md` for the authoritative definitions of gap tiers, geography tiering thresholds, coverage parity targets, and enterprise weighting. Do not re-derive these from part1 notes or agent specs — the skill is the single source of truth.
+**Coverage audit workflow**: When running Phase 1 (data-profiler) or Phase 2 (data-engineer), consult `.claude/skills/coverage-audit/SKILL.md` for *workflow* definitions (stage roles, sampling strategy, enterprise weighting, coverage parity targets) and `config/project.yaml` for *numeric thresholds* (gap tier cutoffs, geography tier cutoffs, blocklist, run scope). The skill defers to the YAML when they disagree.
 
 **Never let one agent do both roles for the same phase.** The separation is the point — it's how trust calibration gets demonstrated (Part 2 of the brief).
 
@@ -115,18 +117,15 @@ This split is **intentional** — rules are deterministic and cacheable; LLM add
 
 ### Stratification & Tiering
 
-States are tiered by record depth. Authoritative thresholds, gap tier definitions (HIGH_GAP/MODERATE_GAP/ADEQUATE), and coverage parity targets are defined in `.claude/skills/coverage-audit/SKILL.md` — reference that document, do not re-derive here.
+Numeric thresholds (tier cutoffs, gap-tier ratios) live in `config/project.yaml`. Workflow context (sampling strategy, coverage parity targets, enterprise weighting) lives in `.claude/skills/coverage-audit/SKILL.md`. Don't duplicate values here.
 
-Quick reference (US dataset):
-- **Tier A** (≥ 50,000 records): 23 states, 84.2% of records
-- **Tier B** (10,000–49,999): 25 states, 15.2%
-- **Tier C** (< 10,000): Alaska, South Dakota, North Dakota — exclude from ranked gap lists
-- **Territories** (always excluded): Puerto Rico, American Samoa, Guam, Northern Mariana Islands
+Observed US dataset distribution (descriptive, not a threshold):
+- Tier A: 23 states (84.2% of records); Tier B: 25 states (15.2%); Tier C + territories: excluded (see `markets.us.excluded_subregions` and `excluded_territories` in the YAML).
 
 ### Sampling & Ground Truth
 
-- `data/processed/sample_audit.parquet` — Stratified sample used for audit
-- `evals/ground_truth.json` — 20–25 hand-labeled records for Phase 4 eval
+- `data/processed/sample_audit.parquet` — stratified sample used for audit
+- `evals/ground_truth.json` — hand-labelled records for Phase 4 eval (size range in `config/project.yaml` → `eval.{ground_truth_size_min, ground_truth_size_max}`)
 
 **Important**: Ground truth is **static and hand-curated**. Never regenerate or modify it programmatically.
 
@@ -185,10 +184,9 @@ python evals/eval_runner.py  # Precision/recall against ground_truth.json
 The 4.16M US record dataset (from Phase 1 baseline analysis):
 - **Primary key**: `handle` — perfectly unique (0 collisions, 0 nulls). Use as the stable entity identifier for all joins, logging, and merge-back across Phases 2–4.
 - **State field**: 3.32% of records have invalid/null state. Mostly recoverable via rules (case normalisation, abbreviation expansion, city-split recombination). True foreign records are a small fraction.
-- **Website field**: ~910K missing + ~62,057 records store a platform/social/builder URL (yelp.com, facebook.com, linktr.ee, wixsite.com, etc.) that is effectively NULL for Sales Intelligence. **True missing-website count is ~972K.** When computing fill rates or gap sizes, treat platform URLs as missing.
+- **Website field**: ~910K missing + ~62,057 records store a platform/social/builder URL that is effectively NULL for Sales Intelligence. **True missing-website count is ~972K.** When computing fill rates or gap sizes, treat platform URLs as missing. Platform blocklist lives in `config/project.yaml` → `enrichment_rules.platform_blocklist` (institutional TLDs `.edu`/`.mil`/`.gov` also excluded at the rules layer).
 - **Industry field**: 491 distinct labels; 3 semantic duplicate pairs covering ~329K records (LLM canonical merge needed). 341K records have no industry value.
 - **Size field**: Clean enum; 8 valid bands. 4.49% null rate (missingness only, no OOV values).
-- **Website platform blocklist** (treat as NULL): yelp.com, facebook.com, instagram.com, linkedin.com, twitter.com, linktr.ee, bit.ly, wixsite.com, weebly.com, wordpress.com, squarespace.com, google.com, amazon.com, youtube.com, and .edu/.mil/.gov institutional domains.
 
 ### Candidate Key Analysis (Phase 1 — completed)
 
@@ -209,7 +207,7 @@ Comparator source data: `src/comparator.py` (SUSB), `src/nes_comparator.py` (NES
 
 ### Phase 4 Run 1 Scope — Context for data-engineer
 
-Run 1 targets 51+ employee size bands exclusively (`size IN ('51-200', '201-500', '501-1K', '1K-5K', '5K-10K', '10K+')`). Source: `data/processed/sample_audit.parquet`.
+Run 1 targets the enterprise/mid-market size bands defined in `config/project.yaml` → `markets.us.run1_size_bands` (currently 51+ employees). Source: `markets.us.dataset.sample` (currently `data/processed/sample_audit.parquet`).
 
 Batch composition (~300 records total):
 - ~100: 51–500 employees with website missing or in platform blocklist — worst-coverage states first (Iowa, Kansas, West Virginia, Tennessee, Oregon)
@@ -220,8 +218,9 @@ Run 2 (micro/SMB, <51 employees) is deferred until Run 1 precision/recall result
 
 ### Phase 4 Eval Thresholds — Context for verifier
 
-- **Stage distribution signal**: if Stage 4 (Sonnet) accounts for >40% of resolved records, flag as a cost signal — the cascade is over-relying on the most expensive model
-- **Confidence calibration target**: among records where `confidence >= 0.8`, ≥80% should be correct per ground truth. Below this, the pipeline is over-claiming confidence.
+Thresholds live in `config/project.yaml` → `cascade.{stage4_cost_signal, confidence_threshold, confidence_calibration_target}`. Current values:
+- **Stage distribution signal**: if Stage 4 (Sonnet) accounts for more than `stage4_cost_signal` (40%) of resolved records, flag as a cost signal — the cascade is over-relying on the most expensive model.
+- **Confidence calibration target**: among records where `confidence >= confidence_threshold` (0.80), at least `confidence_calibration_target` (80%) should be correct per ground truth. Below this, the pipeline is over-claiming confidence.
 
 ### Trace Artifact — Single Source of Truth
 
@@ -229,11 +228,7 @@ All LLM call logs go to **`data/processed/observability.jsonl`**. This is the su
 
 ### Budget Enforcement
 
-- **Phase 0–1**: $0 (rules only)
-- **Phase 2**: $3 (agentic audit)
-- **Phase 3**: $0 (commercial framing, no LLM)
-- **Phase 4**: $5 (enrichment cascade, evals)
-- **Phase 5**: $0 (skill documentation, rules-based/manual — no LLM needed)
+Per-phase caps live in `config/project.yaml` → `budget.per_phase_usd` (total: `budget.total_usd`). Current split: Phase 2 = $3 (agentic audit), Phase 4 = $5 (enrichment cascade + evals), all others = $0.
 
 If a phase's budget is exhausted, **stop LLM calls and log it**, never carry over budget from a later phase.
 

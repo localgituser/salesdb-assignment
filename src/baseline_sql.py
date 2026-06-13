@@ -19,10 +19,14 @@ import duckdb
 import logging
 from pathlib import Path
 
+from src.config import CONFIG
+
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 log = logging.getLogger(__name__)
 
-PARQUET = "data/processed/us_companies.parquet"
+PARQUET = CONFIG.market.dataset.parquet
+TIER_A_MIN = CONFIG.geography_tiering.tier_a_min
+TIER_B_MIN = CONFIG.geography_tiering.tier_b_min
 
 US_STATES = [
     "Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado",
@@ -132,8 +136,8 @@ QUERIES = {
             u.state,
             t.n                                                           AS records,
             CASE
-                WHEN t.n >= 50000 THEN 'A'
-                WHEN t.n >= 10000 THEN 'B'
+                WHEN t.n >= {TIER_A_MIN} THEN 'A'
+                WHEN t.n >= {TIER_B_MIN} THEN 'B'
                 ELSE 'C'
             END                                                           AS tier,
             ROUND(COUNT(u.website)  * 100.0 / t.n, 1)                   AS website_fill_pct,
@@ -155,8 +159,8 @@ QUERIES = {
             state,
             COUNT(*) AS records,
             CASE
-                WHEN COUNT(*) >= 50000 THEN 'A'
-                WHEN COUNT(*) >= 10000 THEN 'B'
+                WHEN COUNT(*) >= {TIER_A_MIN} THEN 'A'
+                WHEN COUNT(*) >= {TIER_B_MIN} THEN 'B'
                 ELSE 'C'
             END AS tier,
             ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER (), 2) AS pct_of_us
@@ -175,7 +179,7 @@ QUERIES = {
             GROUP BY state
         )
         SELECT
-            CASE WHEN n >= 50000 THEN 'A' WHEN n >= 10000 THEN 'B' ELSE 'C' END AS tier,
+            CASE WHEN n >= {TIER_A_MIN} THEN 'A' WHEN n >= {TIER_B_MIN} THEN 'B' ELSE 'C' END AS tier,
             COUNT(*) AS states_in_tier,
             SUM(n)   AS total_records,
             MIN(n)   AS min_records,

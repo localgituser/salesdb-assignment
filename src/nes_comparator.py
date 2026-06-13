@@ -178,11 +178,8 @@ def build_combined_coverage(
 
 
 def _gap_tier(ratio: float) -> str:
-    if ratio < 0.10:
-        return "HIGH_GAP"
-    if ratio < 0.30:
-        return "MODERATE_GAP"
-    return "ADEQUATE"
+    from src.config import CONFIG
+    return CONFIG.gap_tiers.classify(ratio)
 
 
 def format_markdown_table(df: pd.DataFrame) -> str:

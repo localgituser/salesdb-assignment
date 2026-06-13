@@ -37,25 +37,18 @@ FIPS_TO_STATE = {
     "54": "West Virginia", "55": "Wisconsin", "56": "Wyoming",
 }
 
-# Tier thresholds must match baseline_sql.py
-TIER_A = 50_000
-TIER_B = 10_000
+from src.config import CONFIG
+
+TIER_A = CONFIG.geography_tiering.tier_a_min
+TIER_B = CONFIG.geography_tiering.tier_b_min
 
 
 def _gap_tier(ratio: float) -> str:
-    if ratio < 0.10:
-        return "HIGH_GAP"
-    if ratio < 0.30:
-        return "MODERATE_GAP"
-    return "ADEQUATE"
+    return CONFIG.gap_tiers.classify(ratio)
 
 
 def _sampling_tier(n: int) -> str:
-    if n >= TIER_A:
-        return "A"
-    if n >= TIER_B:
-        return "B"
-    return "C"
+    return CONFIG.geography_tiering.tier(n)
 
 
 def load_susb_state_totals(path: str) -> pd.DataFrame:

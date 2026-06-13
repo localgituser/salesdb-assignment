@@ -6,7 +6,9 @@ Each phase below maps explicitly to its corresponding Part in the brief. Phase n
 
 Total time budget: ~2-3 working days. Part 4 / Phase 4 gets the largest single share. If running behind, cut from the bottom of the priority list (Phase 5 → Phase 3 → Phase 2), never from Phase 4 or Phase 6.
 
-Global LLM budget: **$10 total**, split per phase below. If a phase's sub-budget is exhausted, stop that phase's LLM calls, log it, and move on — never let an early overrun block Phase 4.
+LLM budget: **self-imposed $10 ceiling** (the brief sets no budget — this is a discipline constraint). Per-phase caps live in `config/project.yaml` → `budget.per_phase_usd`. The phase headers below mirror those values; if they diverge, the YAML wins. If a phase's sub-budget is exhausted, stop that phase's LLM calls, log it, and move on — never let an early overrun block Phase 4.
+
+**Tunable parameters** (gap-tier thresholds, geography tier cutoffs, platform blocklist, cascade thresholds, batch size limits, run scope, market dataset/comparator paths) all live in `config/project.yaml`. To rerun this plan against a different market, edit that YAML — no code changes required.
 
 ---
 

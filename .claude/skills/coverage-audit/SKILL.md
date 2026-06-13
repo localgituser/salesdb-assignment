@@ -1,7 +1,9 @@
 # Skill: coverage-audit
-_Version: 1.1 | Updated: 2026-06-13_
+_Version: 1.2 | Updated: 2026-06-13_
 
-A market coverage audit workflow that runs in two stages: internal data quality profiling, then external gap detection against a government benchmark. Designed to be run on any new market by swapping the dataset path and comparator source — no code changes required.
+A market coverage audit workflow that runs in two stages: internal data quality profiling, then external gap detection against a government benchmark. Designed to be run on any new market by editing `config/project.yaml` — no code changes required.
+
+> **Parameters are loaded from `config/project.yaml`** (gap tier thresholds, geography tier thresholds, platform blocklist, market dataset/comparator paths, run scope). The numbers in this document mirror that file as of the version above; if they diverge, `config/project.yaml` wins.
 
 ---
 
@@ -24,10 +26,9 @@ A market coverage audit workflow that runs in two stages: internal data quality 
 | `geography_col` | string | Column name for sub-region dimension (`state` for US, `country` for APAC) |
 | `size_col` | string | Column name for company size band (`size`) |
 | `industry_col` | string | Column name for industry label (`industry`) |
-| `platform_blocklist` | list | Domains to treat as missing websites (defaults below) |
+| `platform_blocklist` | list | Domains to treat as missing websites (loaded from `config/project.yaml` → `enrichment_rules.platform_blocklist`) |
 
-**Default platform blocklist** (treat any website matching these as NULL for fill-rate purposes):
-`yelp.com`, `facebook.com`, `instagram.com`, `linkedin.com`, `twitter.com`, `linktr.ee`, `bit.ly`, `wixsite.com`, `weebly.com`, `wordpress.com`, `squarespace.com`, `google.com`, `amazon.com`, `youtube.com`, `.edu`, `.mil`, `.gov`
+**Platform blocklist source of truth**: `config/project.yaml` → `enrichment_rules.platform_blocklist`. Treat any website matching one of those domains as NULL for fill-rate purposes. Institutional TLDs (`.edu`, `.mil`, `.gov`) are also excluded at the rules layer.
 
 ### Stage 2 — External Gap Detection (requires a comparator source)
 
@@ -84,23 +85,25 @@ Use the verifier subagent to spot-check the gap candidates in data/processed/gap
 
 ### Geography tiering
 
-Geographies are tiered by record depth before any gap analysis. Only Tier A and Tier B are included in ranked gap lists.
+Geographies are tiered by record depth before any gap analysis. Only Tier A and Tier B are included in ranked gap lists. Thresholds: `config/project.yaml` → `geography_tiering.{tier_a_min, tier_b_min}`.
 
-| Tier | Threshold | Treatment |
+| Tier | Threshold (current US config) | Treatment |
 |---|---|---|
-| Tier A | ≥ 50,000 records | Full confidence — include in all ranked gap lists |
-| Tier B | 10,000–49,999 records | Directional — flag in outputs, include with caveat |
-| Tier C | < 10,000 records | Exclude from ranked lists — flag only |
+| Tier A | ≥ `tier_a_min` (50,000) | Full confidence — include in all ranked gap lists |
+| Tier B | `tier_b_min` ≤ n < `tier_a_min` (10,000–49,999) | Directional — flag in outputs, include with caveat |
+| Tier C | < `tier_b_min` (10,000) | Exclude from ranked lists — flag only |
 
-Territories (Puerto Rico, American Samoa, Guam, Northern Mariana Islands for US) are always excluded regardless of record count.
+Excluded subregions and territories are listed under `markets.<id>.excluded_subregions` and `excluded_territories` in `config/project.yaml`.
 
 ### Gap tiers (coverage ratio = our records / benchmark firm count)
 
-| Tier | Coverage Ratio | Meaning |
+Thresholds: `config/project.yaml` → `gap_tiers.{high_gap_max, moderate_gap_max}`.
+
+| Tier | Coverage Ratio (current config) | Meaning |
 |---|---|---|
-| HIGH_GAP | < 10% | Structural under-representation — sourcing gap, not enrichable |
-| MODERATE_GAP | 10%–30% | Partial coverage — enrichment can improve |
-| ADEQUATE | > 30% | Represented — focus on fill rate quality, not breadth |
+| HIGH_GAP | < `high_gap_max` (10%) | Structural under-representation — sourcing gap, not enrichable |
+| MODERATE_GAP | `high_gap_max` ≤ r < `moderate_gap_max` (10%–30%) | Partial coverage — enrichment can improve |
+| ADEQUATE | ≥ `moderate_gap_max` (30%) | Represented — focus on fill rate quality, not breadth |
 
 **Employer-only benchmark caveat**: When the comparator counts employer firms only (e.g., SUSB), sectors dominated by sole proprietors and gig workers (Transportation, Other Services, Real Estate, Construction) will appear as HIGH_GAP even when coverage is real. Always pair an employer-only comparator with a non-employer source (NES for US) before finalising gap rankings for these sectors.
 

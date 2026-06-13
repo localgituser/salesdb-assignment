@@ -1,0 +1,124 @@
+# Project parameters — single source of truth.
+#
+# Market-agnostic defaults at the top. Market-specific values under `markets.<id>`;
+# `market.active` selects which block is loaded. To run this project on a new
+# market (e.g., an APAC country), add a new entry under `markets` and flip
+# `market.active` — no code changes required.
+
+budget:
+  # Self-imposed ceiling to demonstrate cost discipline. The assignment brief
+  # does not specify a budget ("Use whatever models, tools, and infrastructure
+  # you want"). This number is a constraint we chose, not a brief requirement.
+  total_usd: 10.00
+  per_phase_usd:
+    phase_0: 0.00
+    phase_1: 0.00
+    phase_2: 3.00
+    phase_3: 0.00
+    phase_4: 5.00
+    phase_5: 0.00
+
+models:
+  classification: claude-haiku-4-5-20251001   # cheap, high-volume verification
+  judgment: claude-sonnet-4-6                  # nuanced resolution
+  # USD per million tokens. Update when pricing changes.
+  pricing_per_mtok:
+    claude-haiku-4-5-20251001:
+      input: 0.80
+      output: 4.00
+    claude-sonnet-4-6:
+      input: 3.00
+      output: 15.00
+
+gap_tiers:
+  # Coverage ratio = our_records / comparator_records.
+  # ratio <  high_gap_max      → HIGH_GAP
+  # ratio <  moderate_gap_max  → MODERATE_GAP
+  # ratio >= moderate_gap_max  → ADEQUATE
+  high_gap_max: 0.10
+  moderate_gap_max: 0.30
+
+geography_tiering:
+  # Records-per-subregion thresholds. Tuned for a ~4M-record dataset; adjust
+  # proportionally for markets with materially different total volume.
+  tier_a_min: 50000   # full confidence
+  tier_b_min: 10000   # directional; flag in outputs
+  # < tier_b_min → Tier C, excluded from ranked gap lists
+
+cascade:
+  batch_min: 200
+  batch_max: 1000
+  # If Stage 4 (Sonnet) resolves more than this share of records, the cascade
+  # is over-relying on the expensive model — investigate Stage 3 thresholds.
+  stage4_cost_signal: 0.40
+  # Confidence calibration: among records where confidence >= threshold,
+  # at least `target` share must be correct against ground truth.
+  confidence_threshold: 0.80
+  confidence_calibration_target: 0.80
+
+eval:
+  ground_truth_size_min: 20
+  ground_truth_size_max: 25
+  # Spot-check size per gap candidate (Phase 2 verifier). n=15 gives ~95% power
+  # to detect a gap at expected prevalence ≥20%.
+  spot_check_n_per_gap: 15
+
+enrichment_rules:
+  # Domains treated as effectively NULL for Sales Intelligence purposes
+  # (social, link aggregators, site builders, marketplaces). Market-agnostic.
+  platform_blocklist:
+    - yelp.com
+    - facebook.com
+    - instagram.com
+    - linkedin.com
+    - twitter.com
+    - linktr.ee
+    - bit.ly
+    - hub.biz
+    - wixsite.com
+    - weebly.com
+    - wordpress.com
+    - squarespace.com
+    - google.com
+    - amazon.com
+    - youtube.com
+
+market:
+  active: us
+
+markets:
+  us:
+    name: "United States"
+    subregion_label: state   # "state" for US; "country" or "province" elsewhere
+    dataset:
+      parquet: data/processed/us_companies.parquet
+      sample: data/processed/sample_audit.parquet
+      primary_key: handle
+    comparators:
+      employer:
+        source: SUSB
+        vintage: 2022
+        path: data/raw/susb_2022.csv
+      nonemployer:
+        source: NES
+        vintage: 2023
+        path: data/raw/nes_2023.csv
+    # Phase 4 Run 1 scope: enterprise/mid-market size bands only.
+    run1_size_bands:
+      - "51-200"
+      - "201-500"
+      - "501-1K"
+      - "1K-5K"
+      - "5K-10K"
+      - "10K+"
+    # Subregions below Tier B threshold — exclude from ranked gap lists.
+    excluded_subregions:
+      - Alaska
+      - South Dakota
+      - North Dakota
+    # Out-of-scope territories — always excluded.
+    excluded_territories:
+      - Puerto Rico
+      - American Samoa
+      - Guam
+      - Northern Mariana Islands

@@ -146,8 +146,9 @@ def map_industries_with_llm(
 
     input_tokens = response.usage.input_tokens
     output_tokens = response.usage.output_tokens
-    # Haiku pricing: $0.80/MTok input, $4.00/MTok output
-    cost = (input_tokens * 0.80 + output_tokens * 4.00) / 1_000_000
+    from src.config import CONFIG
+    haiku_pricing = CONFIG.models.pricing_per_mtok["claude-haiku-4-5-20251001"]
+    cost = (input_tokens * haiku_pricing.input + output_tokens * haiku_pricing.output) / 1_000_000
 
     obs.log_call(
         phase=PHASE,
@@ -254,11 +255,8 @@ def build_coverage_table(
 
 
 def _gap_tier(ratio: float) -> str:
-    if ratio < 0.10:
-        return "HIGH_GAP"
-    if ratio < 0.30:
-        return "MODERATE_GAP"
-    return "ADEQUATE"
+    from src.config import CONFIG
+    return CONFIG.gap_tiers.classify(ratio)
 
 
 def format_markdown_table(df: pd.DataFrame) -> str:

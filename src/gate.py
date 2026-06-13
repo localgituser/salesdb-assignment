@@ -10,23 +10,16 @@ from typing import List
 
 import pandas as pd
 
+from src.config import CONFIG
 from src.observability import ObservabilityLogger
 
-PHASE_BUDGETS = {
-    "phase_2": 3.00,
-    "phase_4": 5.00,
-}
-TOTAL_BUDGET = 10.00
-
-PLATFORM_BLOCKLIST = {
-    "yelp.com", "facebook.com", "instagram.com", "linkedin.com", "twitter.com",
-    "linktr.ee", "bit.ly", "hub.biz", "wixsite.com", "weebly.com",
-    "wordpress.com", "squarespace.com", "google.com", "amazon.com", "youtube.com",
-}
-
-RUN1_SIZE_BANDS = {"51-200", "201-500", "501-1K", "1K-5K", "5K-10K", "10K+"}
-
-STAGE4_COST_SIGNAL_THRESHOLD = 0.40
+PHASE_BUDGETS = CONFIG.budget.per_phase_usd
+TOTAL_BUDGET = CONFIG.budget.total_usd
+PLATFORM_BLOCKLIST = CONFIG.enrichment_rules.platform_blocklist_set
+RUN1_SIZE_BANDS = CONFIG.market.run1_size_bands_set
+STAGE4_COST_SIGNAL_THRESHOLD = CONFIG.cascade.stage4_cost_signal
+BATCH_MIN = CONFIG.cascade.batch_min
+BATCH_MAX = CONFIG.cascade.batch_max
 
 
 class GateFailure(Exception):
@@ -49,7 +42,7 @@ def _file_gate(path: str, label: str) -> GateResult:
 
 def _budget_gate(phase: str, logger: ObservabilityLogger) -> GateResult:
     spent = logger.get_phase_cost(phase)
-    cap = PHASE_BUDGETS[phase]
+    cap = PHASE_BUDGETS.get(phase, 0.0)
     if spent >= cap:
         return GateResult(False, "budget_headroom", f"{phase} budget exhausted: ${spent:.4f} of ${cap:.2f} spent")
     return GateResult(True, "budget_headroom", f"{phase} budget OK: ${spent:.4f} spent, ${cap - spent:.4f} remaining")
@@ -121,10 +114,10 @@ def check_batch_quality(batch_path: str) -> List[GateResult]:
     df = pd.read_parquet(batch_path)
     n = len(df)
 
-    if n < 200:
-        results.append(GateResult(False, "batch_size", f"Batch too small: {n} records (min 200)"))
-    elif n > 1000:
-        results.append(GateResult(False, "batch_size", f"Batch too large: {n} records (max 1000)"))
+    if n < BATCH_MIN:
+        results.append(GateResult(False, "batch_size", f"Batch too small: {n} records (min {BATCH_MIN})"))
+    elif n > BATCH_MAX:
+        results.append(GateResult(False, "batch_size", f"Batch too large: {n} records (max {BATCH_MAX})"))
     else:
         results.append(GateResult(True, "batch_size", f"Batch size OK: {n} records"))
 
@@ -205,7 +198,7 @@ def check_cascade_health(enriched_path: str) -> List[GateResult]:
 
     logger = ObservabilityLogger()
     spent = logger.get_phase_cost("phase_4")
-    cap = PHASE_BUDGETS["phase_4"]
+    cap = PHASE_BUDGETS.get("phase_4", 0.0)
     if spent > cap:
         results.append(GateResult(False, "budget_compliance", f"Phase 4 over-budget: ${spent:.4f} vs ${cap:.2f} cap"))
     else:
