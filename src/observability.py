@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 LOG_FILE = "data/processed/observability.jsonl"
-COST_TRACKING_FILE = "data/processed/cost_tracking.txt"
+COST_TRACKING_FILE = "data/processed/cost_tracking.json"
 
 
 class ObservabilityLogger:
@@ -19,20 +19,25 @@ class ObservabilityLogger:
         Path(log_file).parent.mkdir(parents=True, exist_ok=True)
         self.total_cost = self._read_total_cost()
 
-    def _read_total_cost(self) -> float:
-        """Read running cost total from tracking file."""
+    def _read_cost_data(self) -> Dict:
         if os.path.exists(COST_TRACKING_FILE):
             try:
                 with open(COST_TRACKING_FILE) as f:
-                    return float(f.read().strip())
-            except (ValueError, FileNotFoundError):
-                return 0.0
-        return 0.0
+                    return json.load(f)
+            except (ValueError, json.JSONDecodeError, FileNotFoundError):
+                pass
+        return {"total_cost": 0.0, "phases": {}, "last_updated": ""}
 
-    def _write_total_cost(self) -> None:
-        """Write running cost total to tracking file."""
+    def _read_total_cost(self) -> float:
+        return self._read_cost_data()["total_cost"]
+
+    def _write_total_cost(self, phase: str, cost_delta: float) -> None:
+        data = self._read_cost_data()
+        data["total_cost"] = round(data["total_cost"] + cost_delta, 10)
+        data["phases"][phase] = round(data["phases"].get(phase, 0.0) + cost_delta, 10)
+        data["last_updated"] = datetime.now(timezone.utc).isoformat()
         with open(COST_TRACKING_FILE, "w") as f:
-            f.write(str(self.total_cost))
+            json.dump(data, f, indent=2)
 
     def log_call(
         self,
@@ -56,8 +61,8 @@ class ObservabilityLogger:
             "metadata": metadata or {},
         }
         self.total_cost += cost
-        self._write_total_cost()
-        
+        self._write_total_cost(phase, cost)
+
         with open(self.log_file, "a") as f:
             f.write(json.dumps(entry) + "\n")
 
@@ -65,7 +70,7 @@ class ObservabilityLogger:
         """Sum costs for a given phase."""
         if not os.path.exists(self.log_file):
             return 0.0
-        
+
         total = 0.0
         with open(self.log_file) as f:
             for line in f:
@@ -77,6 +82,35 @@ class ObservabilityLogger:
     def check_budget(self, phase: str, budget: float) -> bool:
         """Check if phase cost is within budget."""
         return self.get_phase_cost(phase) <= budget
+
+    @classmethod
+    def sync_from_jsonl(cls, log_file: str = LOG_FILE) -> None:
+        """Rebuild cost_tracking.json from scratch by scanning observability.jsonl.
+        Use for initialization and recovery when cost_tracking.json is missing or stale."""
+        if not os.path.exists(log_file):
+            return
+
+        total = 0.0
+        phases: Dict[str, float] = {}
+        with open(log_file) as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                entry = json.loads(line)
+                cost = entry.get("cost", 0.0)
+                phase = entry.get("phase", "unknown")
+                total += cost
+                phases[phase] = round(phases.get(phase, 0.0) + cost, 10)
+
+        data = {
+            "total_cost": round(total, 10),
+            "phases": phases,
+            "last_updated": datetime.now(timezone.utc).isoformat(),
+        }
+        Path(COST_TRACKING_FILE).parent.mkdir(parents=True, exist_ok=True)
+        with open(COST_TRACKING_FILE, "w") as f:
+            json.dump(data, f, indent=2)
 
 
 logger = ObservabilityLogger()
