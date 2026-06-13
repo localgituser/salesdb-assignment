@@ -50,7 +50,7 @@ pip install -r requirements.txt
 - Output: `poc_enriched_sample.parquet`, eval results
 
 ### Phase 5: Reusable Skill
-- `skills/SKILL.md` documenting pipeline
+- `.claude/skills/coverage-audit/SKILL.md` documenting pipeline
 
 ### Phase 6: 90-Day Pod Plan
 - Thesis, metrics, work items, sequencing, risks

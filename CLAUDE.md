@@ -39,9 +39,13 @@ This project uses three subagents defined in `.claude/agents/`:
 
 **Phase 3 (commercial framing) and Phase 5 (SKILL.md) are not delegated to subagents** — they are manual/Claude tasks with $0 LLM budget.
 
+**Coverage audit workflow**: When running Phase 1 (data-profiler) or Phase 2 (data-engineer), consult `.claude/skills/coverage-audit/SKILL.md` for the authoritative definitions of gap tiers, geography tiering thresholds, coverage parity targets, and enterprise weighting. Do not re-derive these from part1 notes or agent specs — the skill is the single source of truth.
+
 **Never let one agent do both roles for the same phase.** The separation is the point — it's how trust calibration gets demonstrated (Part 2 of the brief).
 
 Verifier calls (spot-checks, eval_runner) do not count against the phase's LLM budget — they're read-only/deterministic by design.
+
+**Skill & agent spec updates require user approval.** Never edit `.claude/skills/coverage-audit/SKILL.md` or any file in `.claude/agents/` without first showing the user the proposed change and getting explicit sign-off. Present: (1) what triggered the update, (2) the exact diff, (3) why it passes the promotion gate (pattern, not incident). Only proceed after the user approves.
 
 ## Context Hygiene (avoid burning tokens)
 
@@ -111,14 +115,13 @@ This split is **intentional** — rules are deterministic and cacheable; LLM add
 
 ### Stratification & Tiering
 
-States are tiered by record depth (calibrated for the 4.16M-record dataset scale):
-- **Tier A** (≥ 50,000 records): Full confidence, include in ranked gap lists
-- **Tier B** (10,000–49,999): Directional, flag in outputs
-- **Tier C** (< 10,000): Exclude from ranked lists, append to audit tables
+States are tiered by record depth. Authoritative thresholds, gap tier definitions (HIGH_GAP/MODERATE_GAP/ADEQUATE), and coverage parity targets are defined in `.claude/skills/coverage-audit/SKILL.md` — reference that document, do not re-derive here.
 
-**Tier C states**: Alaska, South Dakota, North Dakota. **Territories** (always excluded): Puerto Rico, American Samoa, Guam, Northern Mariana Islands. Territory record counts are 5–239 — too thin for any statistical conclusions.
-
-This tiering is defined in Phase 1 and referenced throughout.
+Quick reference (US dataset):
+- **Tier A** (≥ 50,000 records): 23 states, 84.2% of records
+- **Tier B** (10,000–49,999): 25 states, 15.2%
+- **Tier C** (< 10,000): Alaska, South Dakota, North Dakota — exclude from ranked gap lists
+- **Territories** (always excluded): Puerto Rico, American Samoa, Guam, Northern Mariana Islands
 
 ### Sampling & Ground Truth
 
@@ -163,7 +166,7 @@ python evals/eval_runner.py  # Precision/recall against ground_truth.json
 ### Data Files
 - `data/raw/` — Source datasets (not in repo, loaded from Kaggle)
 - `data/processed/us_companies.parquet` — Main dataset (Parquet format)
-- `data/processed/baseline_audit.md` — Fill-rate tables, sampling strategy
+- `data/processed/baseline_audit.md` — Phase 0 initial data discovery (global dataset mismatch finding; historical artifact)
 - `data/processed/sample_audit.parquet` — Stratified sample for audit
 - `data/processed/observability.jsonl` — Line-delimited LLM call logs
 - `data/processed/cost_tracking.json` — Running total + per-phase cost breakdown (single JSON object)
@@ -173,7 +176,7 @@ python evals/eval_runner.py  # Precision/recall against ground_truth.json
 - `prompts/audit_v1.txt` — LLM prompt for Phase 2 gap detection
 - `prompts/enrichment_v1.txt` — LLM prompt for Phase 4 enrichment
 - `notes/strategy_v3.md` — Full execution plan with budgets, timelines, and brief Part mapping
-- `skills/SKILL.md` — (Phase 5) Reusable skill documentation (enrichment pipeline, market-parameterised)
+- `.claude/skills/coverage-audit/SKILL.md` — Coverage audit skill: market-parameterised workflow for internal profiling + external gap detection. Canonical source for gap tier thresholds, coverage parity targets, enterprise weighting, and sampling strategy.
 
 ## Important Patterns & Constraints
 
