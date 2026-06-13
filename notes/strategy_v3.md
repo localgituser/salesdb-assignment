@@ -15,25 +15,44 @@ LLM budget: **self-imposed $10 ceiling** (the brief sets no budget — this is a
 ## Repo structure
 
 ```
+├── config/
+│   └── project.yaml          # all tunable parameters — single source of truth
 ├── data/
 │   ├── raw/
 │   ├── processed/
+│   │   ├── us_companies.parquet        # Phase 0 output (raw, never modified)
+│   │   ├── us_companies_clean.parquet  # Phase 1.5 output (rules-cleaned)
+│   │   ├── sample_audit.parquet        # Phase 1 stratified sample
+│   │   ├── gap_candidates.json         # Phase 1.6 output (annotated by Phase 2 data-engineer)
+│   │   ├── observability.jsonl         # all LLM call traces
+│   │   └── cost_tracking.json          # running cost totals
 │   └── enriched/
+│       └── poc_enriched_sample.parquet # Phase 4 output
 ├── src/
+│   ├── config.py             # typed loader for project.yaml
 │   ├── ingestion.py
 │   ├── sampling.py
-│   ├── rules.py
-│   ├── pipeline.py
+│   ├── rules.py              # Phase 1.5 deterministic cleanup
+│   ├── comparator.py         # SUSB state-level comparison
+│   ├── nes_comparator.py     # SUSB+NES combined industry comparison
+│   ├── gap_detection.py      # Phase 1.6 state×industry cross-tab → gap_candidates.json
+│   ├── pipeline.py           # Phase 4 cascade enrichment
+│   ├── gate.py               # batch quality gate (Phase 4)
 │   └── observability.py
 ├── prompts/
 │   ├── audit_v1.txt
 │   └── enrichment_v1.txt
 ├── evals/
-│   ├── ground_truth.json   # 20-25 hand-labeled records
+│   ├── ground_truth.json     # 20-25 hand-labeled records (static)
 │   └── eval_runner.py
-├── skills/
-│   └── SKILL.md
-├── notebooks/               # scratch only, nothing production lives here
+├── notes/
+│   ├── part1_baseline_observations.md
+│   ├── gap_findings.md       # Phase 2 verifier output
+│   └── strategy_v3.md        # this file
+├── .claude/
+│   ├── agents/               # data-profiler, data-engineer, verifier specs
+│   └── skills/coverage-audit/SKILL.md
+├── notebooks/                # scratch only, nothing production lives here
 ├── requirements.txt
 └── README.md
 ```
@@ -78,7 +97,11 @@ Write `baseline_audit.md`:
 - sampling/stratification approach (1 paragraph) — including *why* 15-record spot-checks per gap give a defensible signal (at expected gap prevalence ≥20%, n=15 yields ~95% power to detect the gap above noise)
 - coverage parity definition: which attributes (name, website, industry, employee range, location), at what fill rates (e.g. ≥85% for name/state, ≥60% for website), at what accuracy standard, and how this varies by state tier (Tier A = full parity target, Tier B = directional target, Tier C = excluded)
 
-**Output:** `baseline_audit.md`, `data/processed/sample_audit.parquet`
+**Phase 1.5 — Deterministic Cleanup Gate** (no LLM, $0): Run `src/rules.py` before Phase 2 to produce `us_companies_clean.parquet`. Rules: state normalisation (case, abbreviation, city-leak recombine), website platform/institutional-TLD reclassification, founded pre-1800 null-out, name garbage/sentinel null-out, city junk null-out. Adds `rules_flags` column + three boolean flag columns (`has_non_latin_name`, `implausible_size_founded`, `has_shared_domain`). All Phase 2–4 scripts read from the clean parquet, not the raw one.
+
+**Phase 1.6 — Deterministic Gap Detection** (no LLM, $0): Run `src/gap_detection.py` to produce the ranked gap candidate list via pure arithmetic — `our_count / SUSB_count` per state×industry and state×size band. Output: `data/processed/gap_candidates.json` (gap tier per cell: HIGH/MODERATE/ADEQUATE). This is SQL/Python only; no judgment calls. Phase 2 consumes this file as input — it does not re-derive gaps from SUSB.
+
+**Output:** `baseline_audit.md`, `data/processed/sample_audit.parquet`, `data/processed/us_companies_clean.parquet`, `data/processed/gap_candidates.json`
 
 ---
 
@@ -86,14 +109,15 @@ Write `baseline_audit.md`:
 **→ Brief: Part 2 "Agentic Coverage & Quality Audit"**
 Target: 2-3 hrs | Budget: $3
 
-**Separation of roles is the point here** — the brief explicitly tests trust calibration. Use the data-engineer subagent to produce gap candidates, then the verifier subagent to spot-check independently.
+**Separation of roles is the point here** — the brief explicitly tests trust calibration. The deterministic gap list already exists from Phase 1.6; Phase 2 is purely LLM judgment and spot-checks on top of it.
 
-- **data-engineer subagent**: reads baseline tables + SUSB/NES comparator outputs, surfaces candidate gaps by state/industry/size. Output: `data/processed/gap_candidates.json`.
-- **verifier subagent**: independently spot-checks 15 records per candidate gap against raw data. Produces `gap_findings.md`.
+- **Input**: `data/processed/gap_candidates.json` (from Phase 1.6). Do not re-derive gaps from SUSB — that work is done.
+- **data-engineer subagent**: for each gap candidate, uses LLM to add commercial reasoning, assess whether the gap is a sourcing gap vs. enrichment opportunity, and assign a confidence score. Annotates `gap_candidates.json` in-place (adds `reasoning`, `gap_type`, `confidence` fields).
+- **verifier subagent**: independently spot-checks 15 records per candidate gap against raw data. Produces `notes/gap_findings.md`.
 - Every model call logged to `data/processed/observability.jsonl` (prompt_version, model, latency, cost, outcome). This is the submission's trace artifact.
 - `gap_findings.md` must contain, per gap: what's missing, prevalence, confidence, "agent claimed X / spot-check found Y" — even when they agree. Silent agreement suppresses a useful signal.
 
-**Output:** `gap_findings.md`, `data/processed/gap_candidates.json`, traces in `data/processed/observability.jsonl`
+**Output:** `notes/gap_findings.md`, annotated `data/processed/gap_candidates.json`, traces in `data/processed/observability.jsonl`
 
 ---
 

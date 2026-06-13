@@ -83,6 +83,29 @@ These are **rules-fixable** — normalisation (case folding, whitespace trim, ab
 
 ---
 
+## 1c. Post-Cleanup Null-State: High-Value Records Unassignable to Phase 2
+
+_Queried from `data/processed/us_companies_clean.parquet` (post-rules-cleanup). Pre-cleanup Section 1b used `us_companies.parquet` and reported 142,792 excluded (null + invalid state combined); after rules recovery of ~18,267 records, the residual null-state population is **124,525**._
+
+**Phase 2 treatment**: Records with `state IS NULL` after cleanup cannot be bucketed into any state-level gap calculation and are excluded from Phase 2 denominators. City is not a Phase 2 dimension and does not affect inclusion.
+
+**High-value residue** (mid-market and enterprise with null state post-cleanup):
+
+| Size Band | Null-State Count |
+|---|---|
+| 51–200 | 7,787 |
+| 201–500 | 2,536 |
+| 1K–5K | 914 |
+| 10K+ | 528 |
+| 5K–10K | 270 |
+| **Total (51+)** | **13,061** |
+
+13,061 mid-market and enterprise records (~10.5% of the 124K null-state total) have no assignable state. These are excluded from Phase 2 gap ratios but should be **logged as a separate finding** in `gap_candidates.json` — they represent recoverable enrichment value in Phase 4 (a company with 500+ employees very likely has a public website that would reveal HQ state). Tag as `state_unknown_high_value` in the gap candidates output.
+
+Records missing **industry** or **size** remain in Phase 2 denominators — they are the gap signal, not an exclusion criterion.
+
+---
+
 ## 2. State Tier Distribution
 
 Thresholds calibrated for 4.25M-record scale:
@@ -117,6 +140,8 @@ Proportional stratified random sample across Tier A and Tier B states, weighting
 | **Total** | **48** | — | **~3,550** |
 
 Within each state, records are stratified by **industry sector** (proportional to state distribution) and **size band** (to ensure enterprise records are not diluted — see over-sampling note below). This produces `data/processed/sample_audit.parquet`.
+
+**Per-state sample size rationale**: At 95% confidence, n=100 per Tier A state yields ±9.8% margin of error; n=50 per Tier B yields ±13.9% — consistent with the "directional" label applied to Tier B throughout this document. Both are sufficient to detect a 20-percentage-point gap (the structural-gap floor) with confidence; Tier B findings should not be treated as conclusive without corroboration from the SUSB comparator.
 
 **Enterprise over-sampling**: Because 500+ employee records are only 1.65% of the dataset, naive proportional sampling would yield ~58 enterprise records across 3,550 — too thin for gap analysis. The audit sample targets a minimum of **50 enterprise records per Tier A state** and **20 per Tier B state**, drawn first before filling remaining quota proportionally. This ensures enterprise coverage gaps surface as first-class findings rather than statistical noise.
 
@@ -992,7 +1017,45 @@ Top 5 Arabic examples:
 
 ---
 
-### 11. Summary Table
+### 11. Phase 1.5 — Deterministic Cleanup Gate Results
+
+**Executed**: 2026-06-13 | **Script**: `src/rules.py` | **Input**: `us_companies.parquet` (4,306,855 records) | **Output**: `us_companies_clean.parquet`
+
+Rules are non-destructive: the original parquet is never modified. Each output record carries a `rules_flags` column listing which rules fired (empty = no change). Total records modified: **132,463 of 4,306,855 (3.1%)**.
+
+#### State normalisation (6-step pipeline, first match wins)
+
+| Rule | Records affected |
+|---|---|
+| `state_city_recover` — city field used to disambiguate leaked suffix | 14,142 recovered |
+| `state_abbrev_expand` — USPS codes + dotted variants (A.L., N.Y., etc.) | 2,060 recovered |
+| `state_redundant_prefix` — "Tx Texas" → "Texas" (generic suffix search) | 1,649 recovered |
+| `state_typo_fix` — known typos (Flrida, Californie, etc.) | 416 recovered |
+| `state_unresolvable` — exhausted all steps, set to NULL | 26,613 → NULL |
+
+**Net**: 44,880 invalid state values → **18,267 recovered (40.7%)**, 26,613 unresolvable → NULL.
+
+Note: `state_case_fix` recoveries (title-case normalisation, ~10,495 records per §1b) are applied silently — no flag emitted for case-only fixes since the value is already semantically correct.
+
+#### Website reclassification
+
+| Rule | Records affected |
+|---|---|
+| `website_platform_blocklist` — social/directory/builder domains | 47,056 → NULL |
+| `website_institutional_tld` — .edu / .mil / .gov | 40,864 → NULL |
+| `website_placeholder` — stub strings ("www", "n/a", "example.com", etc.) | 153 → NULL |
+
+**Net**: 88,073 URLs reclassified as NULL. True enrichable-missing website count rises from ~909K to **~997K** (was documented as ~972K in §2a; the institutional-TLD component was underestimated there).
+
+#### Founded cleanup
+
+| Rule | Records affected |
+|---|---|
+| `founded_pre1800` — confirmed junk test records (years 1201, 1212, etc.) | 1,403 → NULL |
+
+---
+
+### 12. Summary Table
 
 | Field | Issue | Count | % of US Records | Fix |
 |---|---|---|---|---|
@@ -1012,3 +1075,69 @@ Top 5 Arabic examples:
 | `name` | Decorative 4-byte Unicode letterforms | 8 | 0.0002% | flag_only |
 | `name` | CJK characters (US records) | 316 | 0.008% | flag_only |
 | `name` | Arabic characters (US records) | 302 | 0.007% | flag_only |
+
+---
+
+## 13. Phase 1.6 — Deterministic State×Industry Gap Detection
+
+_Generated: 2026-06-13 | Script: `src/gap_detection.py` | Source: `us_companies_clean.parquet` + SUSB 2022 | Output: `data/processed/gap_candidates.json`_
+
+Cross-tab: `our_count / SUSB_count` per state×industry cell. Tier C states excluded. Industry labels mapped to NAICS sectors via `data/processed/industry_naics_mapping.json`. Records with null state excluded from denominators; logged separately as `state_unknown_high_value`.
+
+### Coverage scope
+
+| Dimension | Value |
+|---|---|
+| States analyzed | 48 (Tier A: 23, Tier B: 25) |
+| NAICS sectors analyzed | 19 |
+| Total cells | 911 |
+| HIGH_GAP cells (<10% coverage) | 18 |
+| MODERATE_GAP cells (10–30%) | 301 |
+| ADEQUATE cells (>30%) | 592 |
+
+### HIGH_GAP cells (by sector)
+
+| Sector | States in HIGH_GAP | Notes |
+|---|---|---|
+| Other Services (except Public Administration) | 17 | Includes Tier A: New Jersey (8.6%), Florida (9.7%) |
+| Management of Companies and Enterprises | 1 | Delaware only (Tier B, 4.9%) — no NES equivalent, SUSB-only denom |
+
+Other Services is the only nationally-consistent HIGH_GAP sector at state granularity. The 17-state spread is not a sampling artefact — it reflects structural under-capture of the physical-economy service sector (repair, personal care, religious/civic/membership orgs) across the dataset.
+
+### MODERATE_GAP cells (top sectors by state count)
+
+| Sector | States in MODERATE_GAP |
+|---|---|
+| Wholesale Trade | 48 |
+| Retail Trade | 41 |
+| Management of Companies and Enterprises | 40 |
+| Accommodation and Food Services | 39 |
+| Administrative and Support and Waste Management | 38 |
+| Construction | 37 |
+| Other Services (not HIGH_GAP states) | 30 |
+| Transportation and Warehousing | 12 |
+| Real Estate and Rental and Leasing | 10 |
+
+Wholesale Trade, Retail, Accommodation, Construction, and Admin/Support are MODERATE_GAP across nearly all states. These are the sectors where the dataset has systematic (not state-specific) under-coverage — consistent with the NES+SUSB national findings in §10.
+
+### State_unknown_high_value finding
+
+| Size Band | Null-State Count |
+|---|---|
+| 51–200 | 7,787 |
+| 201–500 | 2,536 |
+| 501–1K | 1,026 |
+| 1K–5K | 914 |
+| 5K–10K | 270 |
+| 10K+ | 528 |
+| **Total (51+)** | **13,061** |
+
+13,061 mid-market and enterprise records have no recoverable state post-cleanup. Tagged as `state_unknown_high_value` in `gap_candidates.json`. Phase 4 should include these in enrichment without a state filter — their website/industry gaps are still addressable.
+
+### Phase 2 scope guidance
+
+319 gap candidate cells is too many for Phase 2's $3 LLM budget to annotate exhaustively. Phase 2 data-engineer should prioritize:
+1. All 18 HIGH_GAP cells (especially the Tier A NJ and FL Other Services gaps)
+2. MODERATE_GAP cells in Tier A states for the five priority sectors (Construction, Retail, Wholesale Trade, Accommodation & Food, Other Services)
+
+ADEQUATE sectors (Information, Finance, Professional Services, Health Care) can be skipped — no commercial gap to annotate.
