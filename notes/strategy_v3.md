@@ -63,9 +63,11 @@ Run aggregations: record counts, missingness, fill rates by attribute — nation
 **Candidate key analysis** (required by Part 1): check uniqueness of name+state, name+domain, and any synthetic ID columns. Report collision rate for each combination. Flag which combination is the most defensible candidate key and why — this is a data quality signal reviewers will look for.
 
 Tier states by sample depth:
-- **A** (≥100 records): full confidence
-- **B** (30-99): directional, flag in outputs
-- **C** (<30): excluded from ranked gap lists, listed in one appendix table in `baseline_audit.md`
+- **A** (≥50,000 records): full confidence
+- **B** (10,000–49,999): directional, flag in outputs
+- **C** (<10,000): excluded from ranked gap lists, listed in one appendix table in `baseline_audit.md`
+
+_Authoritative source: `.claude/skills/coverage-audit/SKILL.md` Geography tiering table. If these numbers diverge, the skill wins._
 
 Write `baseline_audit.md`:
 - fill-rate tables (nationwide + by state)
@@ -141,11 +143,11 @@ Build cascade in `src/pipeline.py`. **Fill this table in before writing code:**
 **→ Brief: Part 5 "Reusable Skill"**
 Target: 1 hr | Budget: $0
 
-- `skills/SKILL.md` for the enrichment pipeline (more reusable than the audit — different markets can run it without modifying the audit logic).
+- `.claude/skills/coverage-audit/SKILL.md` for the enrichment pipeline (more reusable than the audit — different markets can run it without modifying the audit logic).
 - Must cover: trigger conditions, required inputs, expected outputs, how to interpret results, known limitations, one worked example invocation + output.
 - Bonus: the skill should be runnable on a different market (e.g., SEA country) without modification — parameterise market/region, not hardcode US.
 
-**Output:** `skills/SKILL.md`
+**Output:** `.claude/skills/coverage-audit/SKILL.md`
 
 ---
 
