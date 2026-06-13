@@ -128,7 +128,7 @@ So if the true within-slice prevalence is ≥ 20%, there is only a ~3.5% chance 
 
 ### Phase 4 Enrichment PoC Sample (~300 records) — Single-Run, Size-Stratified
 
-The PoC runs in a single pass against a size-stratified sample spanning the full enrichable distribution. The earlier two-run framing (51+ first, micro/SMB deferred) was discarded: a PoC's job is to stress-test the cascade, and scoping out 85% of the dataset would tell us nothing about where the pipeline actually breaks. The vintage concern is handled by a strict pre-filter, not deferral.
+The PoC runs in a single pass against a size-stratified sample spanning the full enrichable distribution. 
 
 **Pre-filter (applied, not deferred)**: Exclude records matching `size = '1-10' AND founded >= 2015 AND website IS NULL AND type IS NULL` — the `HIGH_CHURN_RISK` flag from Section 5b. Strict-match count is only ~5,718 records, so excluding them costs almost nothing and removes the highest-stale-entity-risk slice. `size IS NULL` records are also excluded (no anchor field for segment assignment).
 
@@ -145,12 +145,6 @@ The PoC runs in a single pass against a size-stratified sample spanning the full
 Enterprise is heavily oversampled (~0.05% population weight gets 20% of the sample). A record may satisfy multiple conditions (e.g., both website and industry missing); handle-level dedup collapses these — actual sample size is **288 records**.
 
 The `platform_url` condition forces the rules-stage blocklist to fire (yelp/facebook/wixsite etc. as the website value) and is the right test for the platform-URL reclassification logic. Sample is deterministic via `hash(handle || seed)`.
-
-**Why this beats the two-run plan**:
-- Tests the full rules → search → Haiku → Sonnet cascade under actual stress; micro is where Stage 4 over-firing surfaces.
-- Produces precision/recall *per size band* in one $5 pass — directly answers which segments the cascade is trustworthy for.
-- No deferred deliverable risk (Run 2 might never ship); single eval covers the whole dataset story.
-- Same token budget.
 
 **Cost**: ~$0.50–1.50 at Haiku rates, fits the $5 Phase 4 budget.
 
@@ -579,10 +573,13 @@ The future-year (`founded > 2026`) NaN result from Section 6 is resolved: there 
 | `handle` | 4,164,063 | **0** | **0.00%** | 0 |
 | `name + state` | 4,146,445 | 17,618 | 0.42% | 132 |
 | `name + domain` | 4,152,405 | 11,658 | 0.28% | **908,947** |
+| `name + city + state` | 4,155,692 | 8,082 | 0.19% | 51,064 |
 
 **Recommendation**: Use **`handle`** as the primary merge key for all enrichment operations. It is perfectly unique (0 collisions, 0 nulls) and should be treated as the stable entity identifier throughout Phases 2–4.
 
-`name + state` is usable as a human-readable key with a known 0.42% collision caveat — adequate for deduplication checks but not safe for automated merge-back without handle confirmation.
+`name + city + state` is the best human-readable / external-linkage key — adding city cuts the `name + state` collision rate by more than half (0.42% → 0.19%), halving the ambiguity for the micro/SMB tail where state-registered name uniqueness doesn't apply. The 51,064 nulls in key are driven entirely by missing `city` (~1.22% of records); `name` and `state` are both present in the valid-state population. Use this key when joining to external datasets or lookup sources that lack `handle` (e.g., spot-checking enriched output against web search). Do not use for automated merge-back.
+
+`name + state` is usable as a fallback human-readable key with a known 0.42% collision caveat — adequate for deduplication checks but not safe for automated merge-back without handle confirmation.
 
 `name + domain` appears to have a lower collision rate (0.28%) but is misleading: 908,947 records have no website, meaning their domain key is NULL, and `COUNT(DISTINCT (name, NULL))` treats each as unique. The real collision rate among records _with_ a website is higher. Do not use as a merge key.
 
