@@ -1141,3 +1141,40 @@ Wholesale Trade, Retail, Accommodation, Construction, and Admin/Support are MODE
 2. MODERATE_GAP cells in Tier A states for the five priority sectors (Construction, Retail, Wholesale Trade, Accommodation & Food, Other Services)
 
 ADEQUATE sectors (Information, Finance, Professional Services, Health Care) can be skipped — no commercial gap to annotate.
+
+---
+
+## 14. Commercial Significance Assessment
+
+_Added: 2026-06-13 | Context: Phase 1 findings reviewed against Firmable ICP and Sales Intelligence use cases_
+
+Not all gaps matter equally to clients. Below is a ranked commercial reading of the Phase 1.6 findings.
+
+### Gaps that Firmable clients would feel daily
+
+**1. Wholesale Trade — MODERATE_GAP in all 48 states**
+The most commercially painful finding. Wholesale distributors are a core ICP for nearly every B2B sales team using intelligence tools. A nationwide shortfall means clients prospecting into distribution, manufacturing supply chains, or B2B resellers are working with an incomplete picture. This is a churn risk and a deal blocker for clients whose TAM includes wholesale or distribution.
+
+**2. Retail Trade — MODERATE_GAP in 41 states**
+Same commercial exposure for brands, CPG companies, payment processors, and anyone selling point-of-sale or retail tech. 41-state gaps in Retail are not niche — Retail is one of the highest-volume prospecting verticals for mid-market sales tools.
+
+**3. Construction — MODERATE_GAP in 37 states**
+Construction is a high-spend vertical for suppliers, equipment vendors, insurers, and fintech (construction lending). Territory-based field sales teams targeting this vertical are missing a significant slice.
+
+**4. 13,061 mid-market/enterprise records with null state (post-cleanup)**
+Quietly the most severe quality issue for Sales Intelligence. These are 51+ employee companies — the highest-value accounts — with no geographic anchor. They are invisible to territory-based filtering, regional health scoring, and geo-targeted outreach. See Section 1c and `gap_candidates.json` → `state_unknown_high_value`.
+
+**5. Delaware / Management of Companies — 4.9% coverage (HIGH_GAP)**
+Delaware is the incorporation state for holding companies, PE-backed entities, and corporate HQ structures. With only 23 of 466 SUSB establishments captured, clients doing corporate-group mapping or PE deal sourcing are nearly blind in the state that matters most for that use case.
+
+### What looks alarming but is lower commercial priority
+
+**Other Services HIGH_GAP (17 states, <10% coverage)**: NAICS 81 includes auto repair, personal care, pet services — dominated by micro-businesses and sole operators. The SUSB benchmark overcounts here because it includes gig-economy operators that Sales Intelligence clients typically do not prospect. The gap is real but the commercial exposure is low. Verify against NES before ranking this above the Wholesale/Retail/Construction gaps.
+
+### Recommended commercial priority order for Phase 3
+
+1. Wholesale Trade (nationwide, all client verticals)
+2. Retail Trade (41 states, high-volume ICP)
+3. Construction (37 states, high-value vertical)
+4. State-unknown high-value records (cross-cutting, breaks geographic workflows for best accounts)
+5. Delaware / Management of Companies (niche but high-signal for PE/HQ targeting ICPs)

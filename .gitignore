@@ -12,3 +12,5 @@ venv/
 .claude/plans
 .claude/state
 .claude/settings.json
+
+archive/

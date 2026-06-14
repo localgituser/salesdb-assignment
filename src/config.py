@@ -113,11 +113,24 @@ class Market(BaseModel):
         return frozenset(self.enrichable_size_bands)
 
 
+class SizeTargets(BaseModel):
+    min_size: int
+    max_size: Optional[int] = None
+    website_fill: float
+    industry_fill: float
+    size_fill: float
+    website_precision: float
+    industry_precision: float
+    size_precision: float
+    platform_policy: str
+
+
 class ProjectConfig(BaseModel):
     budget: Budget
     models: Models
     gap_tiers: GapTiers
     geography_tiering: GeographyTiering
+    coverage_parity_targets: Dict[str, SizeTargets]
     cascade: Cascade
     eval: Eval
     enrichment_rules: EnrichmentRules
@@ -138,6 +151,7 @@ def load_config(path: Path = CONFIG_PATH) -> ProjectConfig:
         "models": raw["models"],
         "gap_tiers": raw["gap_tiers"],
         "geography_tiering": raw["geography_tiering"],
+        "coverage_parity_targets": raw["coverage_parity_targets"],
         "cascade": raw["cascade"],
         "eval": raw["eval"],
         "enrichment_rules": raw["enrichment_rules"],

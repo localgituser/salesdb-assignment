@@ -45,6 +45,47 @@ geography_tiering:
   tier_b_min: 10000   # directional; flag in outputs
   # < tier_b_min → Tier C, excluded from ranked gap lists
 
+coverage_parity_targets:
+  enterprise:
+    min_size: 501
+    website_fill: 0.99
+    industry_fill: 0.99
+    size_fill: 0.99
+    website_precision: 0.99
+    industry_precision: 0.95
+    size_precision: 0.98
+    platform_policy: "strict_nullify"
+  mid_market:
+    min_size: 51
+    max_size: 500
+    website_fill: 0.92
+    industry_fill: 0.97
+    size_fill: 0.98
+    website_precision: 0.95
+    industry_precision: 0.90
+    size_precision: 0.95
+    platform_policy: "strict_nullify"
+  smb:
+    min_size: 11
+    max_size: 50
+    website_fill: 0.85
+    industry_fill: 0.93
+    size_fill: 0.96
+    website_precision: 0.90
+    industry_precision: 0.85
+    size_precision: 0.95
+    platform_policy: "nullify_and_flag"
+  micro:
+    min_size: 1
+    max_size: 10
+    website_fill: 0.75
+    industry_fill: 0.85
+    size_fill: 0.93
+    website_precision: 0.90
+    industry_precision: 0.85
+    size_precision: 0.93
+    platform_policy: "nullify_and_flag"
+
 cascade:
   batch_min: 200
   batch_max: 1000

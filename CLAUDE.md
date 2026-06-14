@@ -294,6 +294,12 @@ Edit `src/rules.py` and test on a small slice of `sample_audit.parquet` before r
 ### Modify prompts
 Update `prompts/audit_v1.txt` or `prompts/enrichment_v1.txt`, increment version, and update the `prompt_version` parameter in the corresponding phase script and observability logger.
 
+## Operational Patterns
+
+**Upstream Feedback Loop (Phase 2 → Phase 1)**: When agents discover a systematic programmatic bug (e.g., a whole vertical has trailing syntax like `"Technology, Inc."`), do not patch it inside the Phase 2 agent script. Log the issue, route it back to `src/rules.py`, re-ingest, and re-run from the clean state. Keep the diagnostic layer clean.
+
+**Search Wrapper Failure (Phase 4)**: Never use consumer-facing search wrappers (Perplexity, etc.) for structured pipeline throughput — they introduce latency variance and make strict JSON schema enforcement unreliable. Use a structured API (e.g. Google Places) to fetch raw strings, then pass explicitly to Claude for entity matching and schema-conforming output.
+
 ## Notes on Codebase State
 
 - **Phases 0–1**: Core infrastructure (ingestion, observability, stratification) — stable, foundational

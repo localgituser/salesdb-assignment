@@ -1,9 +1,9 @@
 # Skill: coverage-audit
-_Version: 1.2 | Updated: 2026-06-13_
+_Version: 2.0 | Updated: 2026-06-13_
 
 A market coverage audit workflow that runs in two stages: internal data quality profiling, then external gap detection against a government benchmark. Designed to be run on any new market by editing `config/project.yaml` — no code changes required.
 
-> **Parameters are loaded from `config/project.yaml`** (gap tier thresholds, geography tier thresholds, platform blocklist, market dataset/comparator paths, run scope). The numbers in this document mirror that file as of the version above; if they diverge, `config/project.yaml` wins.
+> **Parameters are loaded from `config/project.yaml`** (gap tier thresholds, geography tier thresholds, platform blocklist, market dataset/comparator paths, run scope, size-stratified coverage targets). The numbers in this document mirror that file as of the version above; if they diverge, `config/project.yaml` wins.
 
 ---
 
@@ -117,14 +117,14 @@ Not all gaps are equal commercially. When ranking enrichment targets:
 
 ### Coverage parity targets (by size band)
 
-A geography reaches coverage parity when all four size bands meet their respective field-level thresholds:
+A geography reaches coverage parity when all four size bands meet their respective completeness (fill rate) and correctness (precision) thresholds. These are loaded from `config/project.yaml` under `coverage_parity_targets`:
 
-| Size Band | Website Fill Target | Industry Fill Target | Size Fill Target |
-|---|---|---|---|
-| Enterprise (500+) | ≥ 99% | ≥ 99% | ≥ 99% |
-| Mid-market (51–500) | ≥ 95% | ≥ 97% | ≥ 98% |
-| SMB (11–50) | ≥ 88% | ≥ 93% | ≥ 96% |
-| Micro (<11) | ≥ 75% | ≥ 85% | ≥ 93% |
+| Size Band | Website Fill Target | Industry Fill Target | Size Fill Target | Website Precision | Industry Precision | Size Precision | Platform URL Policy |
+|---|---|---|---|---|---|---|---|
+| Enterprise (500+) | ≥ 99% | ≥ 99% | ≥ 99% | ≥ 99% | ≥ 95% | ≥ 98% | Strict Zero-Tolerance (nullify) |
+| Mid-market (51–500) | ≥ 92% | ≥ 97% | ≥ 98% | ≥ 95% | ≥ 90% | ≥ 95% | Strict Exclusion (nullify) |
+| SMB (11–50) | ≥ 85% | ≥ 93% | ≥ 96% | ≥ 90% | ≥ 85% | ≥ 95% | Clean Domain Priority (nullify & flag) |
+| Micro (1–10) | ≥ 75% | ≥ 85% | ≥ 93% | ≥ 90% | ≥ 85% | ≥ 93% | Platform-Only Recognition (nullify & flag) |
 
 ### Null pattern classification
 
