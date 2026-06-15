@@ -1,0 +1,62 @@
+# Audit Synthesis Prompt v1 — Top 5 Gap Narratives
+# Model: claude-sonnet-4-6 (claude-sonnet-4-6)
+# Phase: phase_2
+# Input: haiku_rankings_json, top_5_sector_detail_json
+# Output: top 5 gap narratives for gap_findings.md
+
+You are writing the definitive gap findings for a B2B Sales Intelligence platform's US market
+coverage audit. The Haiku audit agent has already ranked 19 NAICS sectors by enrichment priority
+and commercial relevance. Your job is to synthesize the top 5 into crisp, credible gap findings
+that a sales team could act on.
+
+## Haiku Ranking Output
+
+{{HAIKU_RANKINGS_JSON}}
+
+## Top 5 Sector Detail (from gap_candidates.json)
+
+{{TOP5_SECTOR_DETAIL_JSON}}
+
+## Dataset Context
+
+- Total US records: ~4.16M (post state-cleanup)
+- Comparator: SUSB 2022 employer firms + NES 2023 non-employers
+- NES is dominated by sole proprietors with no employees — these are structurally absent
+  from LinkedIn-style data and cannot be enriched. Any gap inflated by NES should be noted.
+- Website missing: ~972K records (including platform URL reclassification)
+- Industry missing: ~341K records
+- Enterprise (500+): only 1.65% of dataset — structurally thin by sourcing
+
+## Output Format
+
+Return a JSON object:
+
+{
+  "synthesis_model": "claude-sonnet-4-6",
+  "prompt_version": "audit_synthesis_v1",
+  "top_5_gaps": [
+    {
+      "rank": 1,
+      "gap_id": "short_slug_e.g._retail_coverage",
+      "naics_code": "XX",
+      "naics_desc": "...",
+      "headline": "one sentence: what is the gap",
+      "prevalence": "X% coverage across N states (HIGH_GAP in M states)",
+      "root_cause": "1-2 sentences on why this gap exists",
+      "commercial_impact": "1-2 sentences: which ICP feels this? what deals does it cost?",
+      "enrichment_approach": "1 sentence: how to close it (source type, method)",
+      "confidence": 0.0,
+      "confidence_rationale": "one sentence on what limits confidence",
+      "nes_inflation_note": "one sentence if NES dominates the gap denominator, else null"
+    }
+  ],
+  "cross_gap_pattern": "1-2 sentences on the common thread across the top 5",
+  "recommended_phase4_target": "gap_id of the single best Phase 4 PoC target, with one-sentence rationale"
+}
+
+Rules:
+- headline must be self-contained — assume the reader hasn't seen the data.
+- commercial_impact must name a real buyer type (e.g., "mid-market SaaS AEs targeting retail SMBs").
+- Do NOT invent figures not in the input data. Cite coverage_pct and state counts from the input.
+- confidence is your calibrated estimate that the gap is real and actionable (0.0–1.0).
+- Return ONLY the JSON object. No markdown, no preamble.
