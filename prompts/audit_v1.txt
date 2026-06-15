@@ -1,51 +1,37 @@
-# Audit Prompt v1 — Sector Ranking & Root Cause
+# Audit Prompt v1 — Commercial Relevance & Enrichment Approach
 # Model: claude-haiku-4-5-20251001
 # Phase: phase_2
-# Input: sector_summary_json (19 NAICS sectors with coverage metrics)
-# Output: ranked sectors with root_cause, gap_type, commercial_relevance, confidence
+# Inputs: actionable_sectors_json, size_quality_json, sourcing_limit_sectors_json
+# Output: ranked sectors with commercial_relevance + enrichment_approach + size gap finding
 
-You are auditing a US company dataset (~4.16M records) for a B2B Sales Intelligence platform.
-The dataset is sourced from LinkedIn-style company profiles aggregated across public web sources.
-Your comparator is SUSB 2022 (employer firms) + NES 2023 (non-employer sole proprietors), which
-represents the US Census Bureau's count of all legal business entities.
+You are an analyst for a B2B Sales Intelligence platform. Coverage ratios, gap tiers, and NES
+inflation analysis have already been computed deterministically from Census data (SUSB 2022 +
+NES 2023). Sectors where NES non-employers dominate (>70% of comparator) have been pre-classified
+as SOURCING_LIMIT and are listed separately — do not re-classify them.
 
-Your task: assess each NAICS sector's coverage gap and classify it.
+Your task is to assess the ACTIONABLE sectors: for each one, provide:
+1. Commercial relevance — would closing this gap generate deals or prevent churn for Sales Intel?
+2. Enrichment approach — what source type or method would close it?
+3. Confidence — how certain are you the gap is real and closeable?
 
-## Context
+You also have size-dimension quality data to assess separately.
 
-Coverage ratio = our_records / comparator_total. A ratio of 0.10 means we have 10% of what
-the Census says exists. This is NOT necessarily a problem — it depends on the gap type.
+## What NOT to do
+- Do not re-derive coverage ratios or gap tiers — they are given.
+- Do not re-classify the SOURCING_LIMIT sectors — that decision is already made.
+- Do not explain what NES is — that context is already in the audit.
 
-## Gap Types
+## Actionable Sectors (NES share <70%, coverage gaps real and potentially closeable)
 
-- SOURCING_LIMIT: The missing businesses are structurally absent from LinkedIn-style data
-  (e.g., NES non-employers: sole-proprietor truckers, freelance cleaners, individual agents).
-  These cannot be closed by enriching existing records. Flag as low enrichment priority.
+{{ACTIONABLE_SECTORS_JSON}}
 
-- ENTITY_MISMATCH: Census counts legal entities (each LLC separately); our data may merge
-  parent+subsidiary or exclude shell companies. Not a real coverage gap.
+## Size Dimension Quality Data (from us_companies_clean.parquet)
 
-- LABELING_GAP: Companies in this sector exist in our data but are mislabeled under a
-  different industry code. Enrichment (industry reclassification) would close this.
+{{SIZE_QUALITY_JSON}}
 
-- SOURCING_GAP: Real businesses that belong on the platform are absent. Can be closed by
-  targeted acquisition from specialized directories, registries, or web crawls.
+## Pre-classified SOURCING_LIMIT Sectors (for reference only — do not re-score)
 
-- MIXED: Combination of the above — specify the dominant type.
-
-## Commercial Relevance for Sales Intelligence
-
-Score 1-5 (5 = highest) based on:
-- Is this sector an active B2B buyer? (do they buy SaaS, services, or hire vendors?)
-- Would a sales team pay for better coverage here?
-- Is the gap in employer firms (>1 employee) or dominated by NES sole proprietors?
-
-## Input
-
-The following JSON contains 19 NAICS sectors with aggregated coverage statistics across
-all US states in scope (48 Tier A + Tier B states):
-
-{{SECTOR_SUMMARY_JSON}}
+{{SOURCING_LIMIT_SECTORS_JSON}}
 
 ## Output Format
 
@@ -60,23 +46,28 @@ Return a JSON object with this exact structure:
       "naics_code": "XX",
       "naics_desc": "...",
       "overall_coverage_pct": 0.0,
-      "high_gap_states": 0,
-      "gap_type": "SOURCING_LIMIT | ENTITY_MISMATCH | LABELING_GAP | SOURCING_GAP | MIXED",
-      "gap_type_reasoning": "one sentence",
-      "commercial_relevance": 1,
-      "commercial_relevance_reasoning": "one sentence",
-      "enrichment_priority": "HIGH | MEDIUM | LOW | SKIP",
+      "commercial_relevance": 5,
+      "commercial_relevance_reasoning": "one sentence naming the buyer type and deal motion",
+      "enrichment_approach": "one sentence: source type (e.g. state registries, web crawl, industry directories) and method",
+      "enrichment_priority": "HIGH | MEDIUM | LOW",
       "confidence": 0.0,
       "key_caveat": "one sentence or null"
     }
   ],
+  "size_gap_finding": {
+    "headline": "one sentence summarising the most important size-dimension gap",
+    "enterprise_gap": "one sentence on enterprise (500+) sourcing gap vs. B2B importance",
+    "size_unknown_opportunity": "one sentence on the size_unknown enrichment opportunity",
+    "worst_cross_dimension": "one sentence on the worst industry x size website fill combo that is commercially relevant"
+  },
   "top_5_for_synthesis": ["naics_code_1", "naics_code_2", "naics_code_3", "naics_code_4", "naics_code_5"],
-  "audit_notes": "2-3 sentences on any cross-sector patterns or methodological flags"
+  "audit_notes": "1-2 sentences on any cross-sector pattern worth flagging"
 }
 
 Rules:
-- Rank by enrichment_priority DESC, then commercial_relevance DESC, then coverage_pct ASC.
-- SKIP sectors that are SOURCING_LIMIT with commercial_relevance <= 2 (no action possible).
-- top_5_for_synthesis must be the top 5 enrichment-actionable sectors (no SKIP sectors).
-- confidence reflects your certainty in the gap_type classification (0.0–1.0).
+- Rank actionable sectors by enrichment_priority DESC, then commercial_relevance DESC.
+- top_5_for_synthesis: the 5 sectors with highest enrichment_priority + commercial_relevance.
+  May include size as a dimension if the size gap warrants a top-5 slot.
+- commercial_relevance 1-5: 5 = active B2B buyer, sales team would pay for this coverage.
+- confidence: your certainty the gap is real and closeable via the stated approach (0.0-1.0).
 - Return ONLY the JSON object. No markdown, no preamble.
