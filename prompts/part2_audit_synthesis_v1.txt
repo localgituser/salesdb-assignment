@@ -1,6 +1,6 @@
 # Audit Synthesis Prompt v1 — Top 5 Gap Narratives
 # Model: claude-sonnet-4-6
-# Phase: phase_2
+# Part: part_2
 # Inputs: haiku_rankings_json, top5_sector_detail_json, size_quality_json
 # Output: top 5 gap narratives covering industry + size dimensions
 
@@ -62,7 +62,7 @@ Return a JSON object:
     }
   ],
   "cross_gap_pattern": "1-2 sentences on the common thread across the top 5",
-  "recommended_phase4_target": "gap_id and one-sentence rationale for why this is the best PoC target"
+  "recommended_part4_target": "gap_id and one-sentence rationale for why this is the best PoC target"
 }
 
 Rules:

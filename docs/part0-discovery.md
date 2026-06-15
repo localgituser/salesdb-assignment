@@ -1,4 +1,4 @@
-# Phase 0: Baseline Audit & Data Sanity Check
+# Part 0: Baseline Audit & Data Sanity Check
 
 ## Executive Summary
 
@@ -21,7 +21,7 @@
 - Stratification by US state
 
 ### Impact
-The dataset is **global by default**. For Phase 1+ work to be valid against a US-focused audit, we must:
+The dataset is **global by default**. For Part 1+ work to be valid against a US-focused audit, we must:
 1. **Filter to US records only** (using state names matching known US states/territories)
 2. Re-baseline against US-only counts
 3. If applying Census CBP comparator, compare US subset only
@@ -93,13 +93,13 @@ Census County Business Patterns (CBP) counts **physical establishment locations*
 
 ---
 
-## Next Steps (Phase 1)
+## Next Steps (Part 1)
 
 1. **Filter to US records** (state IN known_us_states or country_code = 'US')
 2. **Stratify by state/industry/size** → compute record counts and fill rates
 3. **Tier states** A (≥100 records), B (30-99), C (<30)
 4. **Document rules vs. LLM split** in enrichment strategy
-5. **Output**: `sample_audit.parquet` with aggregated stats
+5. **Output**: `part1_sample_audit.parquet` with aggregated stats
 
 **Budget used so far**: $0  
 **Status**: ✓ On track
@@ -109,7 +109,7 @@ Census County Business Patterns (CBP) counts **physical establishment locations*
 ## Observations for Future Work
 
 1. **Global data is a feature, not a bug** — if the pod pivots to international expansion, this becomes an asset
-2. **State field encoding** is messy (full names, abbreviations, special chars mix) — Phase 1 sampling will surface patterns
+2. **State field encoding** is messy (full names, abbreviations, special chars mix) — Part 1 sampling will surface patterns
 3. **Website field** is high-fill (79.5%) and could be leverage for enrichment/verification
 4. **Size distribution** is heavily skewed to 1-10 person companies (48.7% of records) — may affect industry comparators
 
@@ -117,7 +117,7 @@ Census County Business Patterns (CBP) counts **physical establishment locations*
 
 ## SUSB State Coverage Gap Analysis
 
-_Generated: 2026-06-12 06:29 UTC | Source: US Census SUSB 2022 (`us_state_6digitnaics_2022.csv`) vs `us_companies.parquet`_
+_Generated: 2026-06-12 06:29 UTC | Source: US Census SUSB 2022 (`us_state_6digitnaics_2022.csv`) vs `part0_companies.parquet`_
 
 Across 51 states mapped to SUSB: 0 HIGH_GAP (<10% coverage), 0 MODERATE_GAP (10–30%), 51 ADEQUATE (>30%). No Tier A states are in HIGH_GAP. **Limitations**: SUSB counts legal firms (may be multi-establishment); our data counts records (may include duplicates). Ratios are directional signals, not precise deficits. SUSB vintage is 2022; our dataset vintage may differ.
 
@@ -179,7 +179,7 @@ Across 51 states mapped to SUSB: 0 HIGH_GAP (<10% coverage), 0 MODERATE_GAP (10�
 
 ## SUSB Industry Coverage Gap Analysis
 
-_Generated: 2026-06-12 06:42 UTC | Source: SUSB 2022 national totals vs `us_companies.parquet` | Model: claude-haiku-4-5-20251001_
+_Generated: 2026-06-12 06:42 UTC | Source: SUSB 2022 national totals vs `part0_companies.parquet` | Model: claude-haiku-4-5-20251001_
 
 244 industry labels (≥500 records each) mapped to 20 NAICS sectors via Claude Haiku ($0.01208). Coverage: 0 HIGH_GAP (<10%), 5 MODERATE_GAP (10–30%), 15 ADEQUATE (>30%). No sectors in HIGH_GAP. **Limitations**: Mapping is LLM-generated and approximate; labels with ambiguous industry scope may be misclassified. Records with null or rare industry labels (<500) are counted under NAICS 99 (unclassified). SUSB national totals use State='00' aggregate (not sum of states). Our dataset may contain duplicate records inflating coverage ratios.
 
@@ -210,7 +210,7 @@ _Generated: 2026-06-12 06:42 UTC | Source: SUSB 2022 national totals vs `us_comp
 
 ## SUSB + NES Combined Industry Coverage Gap Analysis
 
-_Generated: 2026-06-12 07:01 UTC | Sources: SUSB 2022 + NES 2023 national totals vs `us_companies.parquet`_
+_Generated: 2026-06-12 07:01 UTC | Sources: SUSB 2022 + NES 2023 national totals vs `part0_companies.parquet`_
 
 Combined SUSB 2022 employer firms + NES 2023 non-employer establishments as universe denominator. Coverage: 8 HIGH_GAP (<10%), 6 MODERATE_GAP (10–30%), 6 ADEQUATE (>30%). Sectors that were over-indexed vs. SUSB alone, now adjusted: Educational Services (144.4% → 15.0%); Arts, Entertainment, and Recreation (191.5% → 15.1%); Mining, Quarrying, and Oil and Gas Extraction (233.4% → 46.3%); Utilities (224.1% → 60.9%); Manufacturing (168.8% → 62.5%); Information (379.7% → 69.4%); Industries not classified (6644.7% → 6644.7%). **Limitations**: SUSB 2022 and NES 2023 are different vintages — directional only. NES counts legal establishments; our dataset may count individual practitioners. Management of Companies (NAICS 55) and Unclassified (99) have no NES equivalent — ratios for those sectors are unchanged from SUSB-only comparison.
 

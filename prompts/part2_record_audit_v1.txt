@@ -1,6 +1,6 @@
 # Record Quality Audit Prompt v1
 # Model: claude-haiku-4-5-20251001
-# Phase: phase_2 (record-level semantic audit)
+# Part: part_2 (record-level semantic audit)
 # Input: batch of up to 10 company records from a gap sector
 # Output: per-record quality flags + batch pattern summary
 

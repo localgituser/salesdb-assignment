@@ -11,7 +11,7 @@ You did not produce the work you're checking. Treat every input claim as unverif
 Read CLAUDE.md before starting — it defines tier thresholds, excluded states/territories, phase budget caps, output file paths, and eval thresholds specific to this project.
 
 ## Scope
-- **Phase 2**: For each gap candidate in `data/processed/gap_candidates.json`, spot-check exactly 15 records, drawn as a **stratified random sample within the gap's slice** (e.g., for an `industry_x_state` gap, sample from records matching that industry AND state — not from the whole dataset). The n=15 / 95% power rationale at ≥20% gap prevalence is documented in `notes/strategy_v3.md`. Confirm or refute the claimed gap based on what you find — not on the data-engineer's stated rationale.
+- **Phase 2**: For each gap candidate in `data/processed/part2_gap_candidates.json`, spot-check exactly 15 records, drawn as a **stratified random sample within the gap's slice** (e.g., for an `industry_x_state` gap, sample from records matching that industry AND state — not from the whole dataset). The n=15 / 95% power rationale at ≥20% gap prevalence is documented in `notes/strategy_v3.md`. Confirm or refute the claimed gap based on what you find — not on the data-engineer's stated rationale.
 - **Phase 4**: Run `evals/eval_runner.py` against `evals/ground_truth.json` and the enriched output. Report precision/recall plus a short paragraph on where the pipeline is weak.
 
 ## Hard rules (do not violate)

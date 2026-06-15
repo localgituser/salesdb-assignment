@@ -59,21 +59,21 @@ def check_part2_entry() -> List[GateResult]:
     """Pre-conditions before running Part 2 gap detection."""
     logger = ObservabilityLogger()
     return [
-        _file_gate("data/processed/us_companies.parquet", "us_companies.parquet"),
-        _file_gate("data/processed/sample_audit.parquet", "sample_audit.parquet"),
+        _file_gate("data/processed/part0_companies.parquet", "part0_companies.parquet"),
+        _file_gate("data/processed/part1_sample_audit.parquet", "part1_sample_audit.parquet"),
         _budget_gate("part_2", logger),
         _total_budget_gate(logger),
     ]
 
 
 def check_part4_entry(
-    gap_candidates_path: str = "data/processed/gap_candidates.json",
+    gap_candidates_path: str = "data/processed/part2_gap_candidates.json",
 ) -> List[GateResult]:
     """Pre-conditions before running Part 4 enrichment."""
     results: List[GateResult] = []
     logger = ObservabilityLogger()
 
-    candidates_gate = _file_gate(gap_candidates_path, "gap_candidates.json")
+    candidates_gate = _file_gate(gap_candidates_path, "part2_gap_candidates.json")
     results.append(candidates_gate)
 
     if candidates_gate.passed:

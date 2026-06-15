@@ -13,8 +13,8 @@ PoC for regional market coverage audit and enrichment pipeline against a 4.16M-r
 | Part 4 — PoC Enrichment Pipeline | Cascade design, eval results, cost/trace summary | `docs/part4-enrichment.md` |
 | Part 5 — Reusable Skill | Skill spec (coverage-audit) | `skills/coverage-audit/SKILL.md` |
 | Part 6 — 90-Day Pod Plan | Thesis, metrics, Linear tickets, sequencing, risk | `docs/part6-plan.md` |
-| Traces | All LLM call logs | `data/processed/observability.jsonl` |
-| Enriched output | 288-record enriched batch | `data/enriched/poc_enriched_sample.parquet` |
+| Traces | All LLM call logs | `data/processed/shared_observability.jsonl` |
+| Enriched output | 288-record enriched batch | `data/enriched/part4_enriched_sample.parquet` |
 | Eval | Ground truth + precision/recall runner | `evals/ground_truth.json`, `evals/eval_runner.py` |
 
 ## Setup
@@ -56,7 +56,7 @@ python evals/eval_runner.py
 ```
 
 ## Cost Tracking
-All LLM costs logged to `data/processed/observability.jsonl` and summarized in `data/processed/cost_tracking.json`.  
+All LLM costs logged to `data/processed/shared_observability.jsonl` and summarized in `data/processed/shared_cost_tracking.json`.  
 Self-imposed budget: **$10 total** — split per phase in `config/project.yaml` → `budget.per_phase_usd`.
 
 ## Part Summary

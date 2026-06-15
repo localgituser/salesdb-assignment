@@ -1,9 +1,9 @@
 """
-Phase 1.6 — Deterministic Gap Detection (SUSB + NES combined)
+Part 1.6 — Deterministic Gap Detection (SUSB + NES combined)
 
 Computes our_count / (SUSB_employer_firms + NES_nonemployers) per state×industry
 cell to produce a ranked list of coverage gaps. Pure Python/SQL — no LLM calls.
-Phase 2 consumes the output JSON and adds LLM reasoning on top.
+Part 2 consumes the output JSON and adds LLM reasoning on top.
 
 Denominator: SUSB 2022 employer firms + NES 2023 non-employer establishments,
 combined per state×NAICS sector. This gives a fuller business universe than
@@ -19,7 +19,7 @@ Filters applied:
   - Tier C states (our_records < TIER_B_MIN) are excluded from gap candidates.
   - Records missing industry stay in the denominator (they ARE the gap signal).
 
-Output: data/processed/gap_candidates.json
+Output: data/processed/part2_gap_candidates.json
 """
 
 import json
@@ -37,9 +37,9 @@ log = logging.getLogger(__name__)
 
 SUSB_CSV = "data/raw/us_state_6digitnaics_2022.csv"
 NES_TXT = "data/raw/nonemp23st.txt"
-CLEAN_PARQUET = "data/processed/us_companies_clean.parquet"
-MAPPING_CACHE = "data/processed/industry_naics_mapping.json"
-OUTPUT_JSON = "data/processed/gap_candidates.json"
+CLEAN_PARQUET = "data/processed/part0_companies_clean.parquet"
+MAPPING_CACHE = "data/processed/part1_industry_naics_mapping.json"
+OUTPUT_JSON = "data/processed/part2_gap_candidates.json"
 
 NAICS_SECTORS = {
     "11": "Agriculture, Forestry, Fishing and Hunting",
@@ -444,7 +444,7 @@ def run(
             "description": (
                 "Mid-market and enterprise records (size 51+) with null state post-cleanup. "
                 "Excluded from state×industry gap ratios because state is a required grouping key. "
-                "Should be included in Phase 4 enrichment without a state filter."
+                "Should be included in Part 4 enrichment without a state filter."
             ),
             "total_null_state_records": null_state_info["total_null_state"],
             "mid_market_enterprise_count": null_state_info["hv_count"],

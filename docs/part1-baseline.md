@@ -1,5 +1,5 @@
 # Part 1 — Baseline Observations
-_Generated: 2026-06-12 | Script: src/phase1_baseline.py | Dataset: data/processed/us_companies.parquet_
+_Generated: 2026-06-12 | Script: src/part1_baseline.py | Dataset: data/processed/part0_companies.parquet_
 
 ---
 
@@ -13,13 +13,13 @@ _Generated: 2026-06-12 | Script: src/phase1_baseline.py | Dataset: data/processe
 | Non-US records (excluded) | 44,880 |
 | US share of file | 96.68% |
 
-**Note**: `us_companies.parquet` is already filtered at Phase 0. Null-state and non-US records are a 3.32% residue — non-trivial for mid-to-large companies (see Section 1b). The effective working dataset is **4.16M US records**, but invalid-state records are worth cleaning before Phase 4.
+**Note**: `part0_companies.parquet` is already filtered at Part 0. Null-state and non-US records are a 3.32% residue — non-trivial for mid-to-large companies (see Section 1b). The effective working dataset is **4.16M US records**, but invalid-state records are worth cleaning before Part 4.
 
 ---
 
 ## 1b. Invalid & Null State Analysis
 
-_Script: `src/phase1_invalid_states.py` | Comparator: full US state name list (50 states + DC + 5 territories)_
+_Script: `src/part1_invalid_states.py` | Comparator: full US state name list (50 states + DC + 5 territories)_
 
 **Summary**
 
@@ -75,19 +75,19 @@ These are **rules-fixable** — normalisation (case folding, whitespace trim, ab
 
 **Foreign-record bound**: ≥1,879 confirmed foreign + an unknown sub-fraction of the 9,619 unclassified (estimated upper bound: ~3K–4K records total foreign). The non-recoverable residue after a full rules pass is therefore expected to be ~3K–4K records (~0.07%–0.10% of the US population) — small enough to drop without commercial impact.
 
-**Recommended fix** (add to `src/shared/rules.py` before Phase 4):
+**Recommended fix** (add to `src/shared/rules.py` before Part 4):
 1. Case-fold + trim: catches "District Of Columbia" → "District of Columbia"
 2. Abbreviation expansion map: "D.C." → "District of Columbia", "Tx Texas" → "Texas", "Fl Florida" → "Florida"
 3. City-in-state lookup: "Portland" → "Oregon" (or flag for manual review if ambiguous), "York" → flag
-4. After normalisation, re-run `record_counts` query to confirm recovery rate before Phase 4 enrichment
+4. After normalisation, re-run `record_counts` query to confirm recovery rate before Part 4 enrichment
 
 ---
 
-## 1c. Post-Cleanup Null-State: High-Value Records Unassignable to Phase 2
+## 1c. Post-Cleanup Null-State: High-Value Records Unassignable to Part 2
 
-_Queried from `data/processed/us_companies_clean.parquet` (post-rules-cleanup). Pre-cleanup Section 1b used `us_companies.parquet` and reported 142,792 excluded (null + invalid state combined); after rules recovery of ~18,267 records, the residual null-state population is **124,525**._
+_Queried from `data/processed/part0_companies_clean.parquet` (post-rules-cleanup). Pre-cleanup Section 1b used `part0_companies.parquet` and reported 142,792 excluded (null + invalid state combined); after rules recovery of ~18,267 records, the residual null-state population is **124,525**._
 
-**Phase 2 treatment**: Records with `state IS NULL` after cleanup cannot be bucketed into any state-level gap calculation and are excluded from Phase 2 denominators. City is not a Phase 2 dimension and does not affect inclusion.
+**Part 2 treatment**: Records with `state IS NULL` after cleanup cannot be bucketed into any state-level gap calculation and are excluded from Part 2 denominators. City is not a Part 2 dimension and does not affect inclusion.
 
 **High-value residue** (mid-market and enterprise with null state post-cleanup):
 
@@ -100,9 +100,9 @@ _Queried from `data/processed/us_companies_clean.parquet` (post-rules-cleanup). 
 | 5K–10K | 270 |
 | **Total (51+)** | **13,061** |
 
-13,061 mid-market and enterprise records (~10.5% of the 124K null-state total) have no assignable state. These are excluded from Phase 2 gap ratios but should be **logged as a separate finding** in `gap_candidates.json` — they represent recoverable enrichment value in Phase 4 (a company with 500+ employees very likely has a public website that would reveal HQ state). Tag as `state_unknown_high_value` in the gap candidates output.
+13,061 mid-market and enterprise records (~10.5% of the 124K null-state total) have no assignable state. These are excluded from Part 2 gap ratios but should be **logged as a separate finding** in `part2_gap_candidates.json` — they represent recoverable enrichment value in Part 4 (a company with 500+ employees very likely has a public website that would reveal HQ state). Tag as `state_unknown_high_value` in the gap candidates output.
 
-Records missing **industry** or **size** remain in Phase 2 denominators — they are the gap signal, not an exclusion criterion.
+Records missing **industry** or **size** remain in Part 2 denominators — they are the gap signal, not an exclusion criterion.
 
 ---
 
@@ -127,9 +127,9 @@ Top 5 Tier A states by record count: California (619K), Texas (351K), New York (
 
 ## 2b. Sampling & Stratification Strategy
 
-At 4.16M records, a full LLM pass is not feasible within the $10 budget. The agentic audit (Phase 2) and enrichment PoC (Phase 4) both require a statistically defensible sample that mirrors the real distribution.
+At 4.16M records, a full LLM pass is not feasible within the $10 budget. The agentic audit (Part 2) and enrichment PoC (Part 4) both require a statistically defensible sample that mirrors the real distribution.
 
-### Phase 2 Audit Sample (~3,500 records)
+### Part 2 Audit Sample (~3,500 records)
 
 Proportional stratified random sample across Tier A and Tier B states, weighting by record count within each state. Tier C excluded (record counts too thin for statistical conclusions).
 
@@ -139,7 +139,7 @@ Proportional stratified random sample across Tier A and Tier B states, weighting
 | Tier B | 25 | ~50 | ~1,250 |
 | **Total** | **48** | — | **~3,550** |
 
-Within each state, records are stratified by **industry sector** (proportional to state distribution) and **size band** (to ensure enterprise records are not diluted — see over-sampling note below). This produces `data/processed/sample_audit.parquet`.
+Within each state, records are stratified by **industry sector** (proportional to state distribution) and **size band** (to ensure enterprise records are not diluted — see over-sampling note below). This produces `data/processed/part1_sample_audit.parquet`.
 
 **Per-state sample size rationale**: At 95% confidence, n=100 per Tier A state yields ±9.8% margin of error; n=50 per Tier B yields ±13.9% — consistent with the "directional" label applied to Tier B throughout this document. Both are sufficient to detect a 20-percentage-point gap (the structural-gap floor) with confidence; Tier B findings should not be treated as conclusive without corroboration from the SUSB comparator.
 
@@ -151,7 +151,7 @@ Within each state, records are stratified by **industry sector** (proportional t
 
 So if the true within-slice prevalence is ≥ 20%, there is only a ~3.5% chance the 15-record spot-check sees zero hits — i.e., **~96.5% power to reject the "no gap" null at the 20% prevalence threshold**. For lower prevalence (p = 0.10), power drops to ~79% — acceptable for directional confirmation but not a guarantee. The 20% threshold is the operational floor for "structural" gaps in this audit; finer-grained gaps are flagged but not ranked.
 
-### Phase 4 Enrichment PoC Sample (~300 records) — Single-Run, Size-Stratified
+### Part 4 Enrichment PoC Sample (~300 records) — Single-Run, Size-Stratified
 
 The PoC runs in a single pass against a size-stratified sample spanning the full enrichable distribution. 
 
@@ -171,9 +171,9 @@ Enterprise is heavily oversampled (~0.05% population weight gets 20% of the samp
 
 The `platform_url` condition forces the rules-stage blocklist to fire (yelp/facebook/wixsite etc. as the website value) and is the right test for the platform-URL reclassification logic. Sample is deterministic via `hash(handle || seed)`.
 
-**Cost**: ~$0.50–1.50 at Haiku rates, fits the $5 Phase 4 budget.
+**Cost**: ~$0.50–1.50 at Haiku rates, fits the $5 Part 4 budget.
 
-Script: `src/phase1_sampling.py` → `data/processed/sample_audit.parquet`. Each row is stamped with `poc_segment` and `poc_condition` so the eval can report per-cell.
+Script: `src/part1_sampling.py` → `data/processed/part1_sample_audit.parquet`. Each row is stamped with `poc_segment` and `poc_condition` so the eval can report per-cell.
 
 ---
 
@@ -228,7 +228,7 @@ Best-coverage states:
 
 ### 4a. Full 51-state fill-rate table (worst → best by avg fill)
 
-_Generated from `data/processed/us_companies.parquet` on the 4,163,774-record valid-state population (50 states + DC). Avg fill = mean of website/industry/size fill percentages._
+_Generated from `data/processed/part0_companies.parquet` on the 4,163,774-record valid-state population (50 states + DC). Avg fill = mean of website/industry/size fill percentages._
 
 | State | Tier | Records | Website % | Industry % | Size % | Avg Fill % |
 |---|---|---|---|---|---|---|
@@ -292,7 +292,7 @@ _Tier A+B states (≥10K records). Mid-market = size bands 51-200 + 201-500. Ent
 
 **Finding**: All 48 Tier A+B states are below parity on website fill for BOTH mid-market (target ≥95%) AND enterprise (target ≥99%). Best mid-market is Delaware at 93.3%; best enterprise is Vermont at 97.9%. The parity targets in the table below are aspirational ceilings — no US state currently clears them on `website`.
 
-Worst 10 states on mid-market website fill (a Phase 4 enrichment priority slice):
+Worst 10 states on mid-market website fill (a Part 4 enrichment priority slice):
 
 | State | Mid-market n | Mid-market website % | Enterprise n | Enterprise website % |
 |---|---|---|---|---|
@@ -307,7 +307,7 @@ Worst 10 states on mid-market website fill (a Phase 4 enrichment priority slice)
 | Kentucky | 3,042 | 87.6 | 604 | 91.7 |
 | Hawaii | 1,076 | 87.6 | 188 | 92.0 |
 
-**Implication for Phase 4 sample weighting**: within the mid-market segment of the PoC sample (see Section 2b), prioritise records from Mississippi, West Virginia, Arkansas, New Mexico, Alabama, Oklahoma, and Louisiana — they have the largest parity gap and a meaningful absolute record count (≥950 per state). Iowa and Kansas (worst overall avg fill in §4) are dominated by their micro/SMB cohorts; their mid-market populations are mid-pack on website fill.
+**Implication for Part 4 sample weighting**: within the mid-market segment of the PoC sample (see Section 2b), prioritise records from Mississippi, West Virginia, Arkansas, New Mexico, Alabama, Oklahoma, and Louisiana — they have the largest parity gap and a meaningful absolute record count (≥950 per state). Iowa and Kansas (worst overall avg fill in §4) are dominated by their micro/SMB cohorts; their mid-market populations are mid-pack on website fill.
 
 ### 4c. Coverage parity definition (size-stratified)
 
@@ -320,7 +320,7 @@ Coverage targets must differ by company size — achieving 90% website fill on m
 | SMB (11–50) | ≥ 88% | ≥ 93% | ≥ 96% |
 | Micro (<11) | ≥ 75% | ≥ 85% | ≥ 93% |
 
-A state reaches overall coverage parity when all four size bands meet their respective thresholds. For gap-ranking purposes (Phase 2), **enterprise and mid-market gaps are weighted 3× vs. micro-business gaps** — a single enterprise record with missing website is worth three micro-business completions for Sales Intelligence ROI.
+A state reaches overall coverage parity when all four size bands meet their respective thresholds. For gap-ranking purposes (Part 2), **enterprise and mid-market gaps are weighted 3× vs. micro-business gaps** — a single enterprise record with missing website is worth three micro-business completions for Sales Intelligence ROI.
 
 The flat aggregate thresholds (website ≥ 90%, industry ≥ 95%, size ≥ 97%) from best-covered Tier A states remain useful as a simple summary signal but should not be used for enrichment prioritisation decisions.
 
@@ -328,19 +328,19 @@ The flat aggregate thresholds (website ≥ 90%, industry ≥ 95%, size ≥ 97%) 
 
 | Dimension | What's measured | Measurement point |
 |---|---|---|
-| Completeness | % of records with a non-null value (after platform-URL reclassification per §6b) | Phase 1 (this document) |
-| Correctness | Precision against ground truth: enriched values that match human-labelled answers | Phase 4 eval (`evals/ground_truth.json`, n=20–25 hand-labelled) |
+| Completeness | % of records with a non-null value (after platform-URL reclassification per §6b) | Part 1 (this document) |
+| Correctness | Precision against ground truth: enriched values that match human-labelled answers | Part 4 eval (`evals/ground_truth.json`, n=20–25 hand-labelled) |
 
 Targets per field:
 - **Website correctness**: ≥ 90% precision (a populated URL must resolve to the company's own domain, not a platform/social URL, not a 404, not a wrong company)
 - **Industry correctness**: ≥ 85% precision against the canonical-merged taxonomy (semantic-duplicate pairs from §6b counted as correct if either label appears)
 - **Size correctness**: ≥ 95% precision (size is enum-bounded; misclassification is the main failure mode)
 
-A state reaches **true parity** when both completeness AND correctness targets are met. The phase-1 baseline cannot measure correctness without ground truth — only Phase 4's eval can. Completeness is the necessary-but-not-sufficient gate.
+A state reaches **true parity** when both completeness AND correctness targets are met. The Part 1 baseline cannot measure correctness without ground truth — only Part 4's eval can. Completeness is the necessary-but-not-sufficient gate.
 
 **State-tier variant on completeness**: Tier A states are held to the full size-band table above. Tier B states are scored *directionally* — they meet parity if they are within 5 percentage points of the Tier A target (e.g., Tier B enterprise website ≥ 94% rather than ≥ 99%) given thinner record counts. Tier C is excluded from parity scoring entirely.
 
-**PoC scope**: Parity targets are evaluated *per segment* in a single PoC pass (see Section 2b). Enterprise and mid-market targets are the realistic Phase 4 deliverable; micro and SMB targets are aspirational against the higher-churn, lower-fill baseline — the eval reports precision/recall per size band so the gap between aspiration and achievement is visible rather than hidden by deferral.
+**PoC scope**: Parity targets are evaluated *per segment* in a single PoC pass (see Section 2b). Enterprise and mid-market targets are the realistic Part 4 deliverable; micro and SMB targets are aspirational against the higher-churn, lower-fill baseline — the eval reports precision/recall per size band so the gap between aspiration and achievement is visible rather than hidden by deferral.
 
 ---
 
@@ -377,7 +377,7 @@ A state reaches **true parity** when both completeness AND correctness targets a
 
 **Observation**: 85.4% of records are micro/small businesses (<50 employees). Enterprise accounts (500+) are only 1.65% of the dataset (~68K records). For Sales Intelligence targeting mid-market and enterprise, the dataset has structural thin coverage at the top of the market — a genuine commercial gap worth flagging.
 
-**PoC scope**: The Phase 4 sample spans all four size segments — enterprise (500+), mid-market (51–500), SMB (11–50), and churn-filtered micro (1–10) — with enterprise oversampled to ~20% of the 300-record sample despite being 1.65% of the population. The earlier "Run 1 = 51+ only, Run 2 = micro/SMB" framing was discarded; see Section 2b for the single-run rationale. A `HIGH_CHURN_RISK` pre-filter (Section 5b) excludes the highest-stale-entity-risk slice of micro (~5,718 records) without deferring the segment entirely.
+**PoC scope**: The Part 4 sample spans all four size segments — enterprise (500+), mid-market (51–500), SMB (11–50), and churn-filtered micro (1–10) — with enterprise oversampled to ~20% of the 300-record sample despite being 1.65% of the population. The earlier "Run 1 = 51+ only, Run 2 = micro/SMB" framing was discarded; see Section 2b for the single-run rationale. A `HIGH_CHURN_RISK` pre-filter (Section 5b) excludes the highest-stale-entity-risk slice of micro (~5,718 records) without deferring the segment entirely.
 
 ---
 
@@ -402,7 +402,7 @@ _Counts and rates below recomputed against the valid-state US population (4,163,
 
 **Vintage reliability interpretation**: Established firms with 51+ employees average 38–61 years old. The 3-year survival probability for firms this size exceeds 95%. Enriching a 2023-vintage record for a company that averaged 38+ years in age in 2023 is very likely to produce a still-accurate result in 2026. By contrast, micro businesses averaging 16 years of age in 2023 include a meaningful fraction of companies founded 2018–2022 — a cohort with 35–45% failure rates over a 5-year window. Enriching closed entities wastes tokens and pollutes the output file.
 
-**HIGH_CHURN_RISK pre-filter** (applied in the Phase 4 PoC sample):
+**HIGH_CHURN_RISK pre-filter** (applied in the Part 4 PoC sample):
 ```sql
 size IN ('1-10')
 AND founded >= 2015
@@ -455,7 +455,7 @@ Records matching all four criteria are high-probability stale entities. Strict-m
 
 ## 6b. Field-Type-Aware Value Distribution Audit
 
-_Script: ad-hoc DuckDB queries on `us_companies.parquet` | Scope: 4,164,063 US records_
+_Script: ad-hoc DuckDB queries on `part0_companies.parquet` | Scope: 4,164,063 US records_
 
 Each field was audited according to its expected cardinality. High-cardinality fields (should be mostly unique) were checked for anomalously frequent values. Low-cardinality enum fields were checked for values outside the canonical set. Medium-cardinality categorical fields were checked for near-duplicate labels.
 
@@ -600,7 +600,7 @@ The future-year (`founded > 2026`) NaN result from Section 6 is resolved: there 
 | `name + domain` | 4,152,405 | 11,658 | 0.28% | **908,947** |
 | `name + city + state` | 4,155,692 | 8,082 | 0.19% | 51,064 |
 
-**Recommendation**: Use **`handle`** as the primary merge key for all enrichment operations. It is perfectly unique (0 collisions, 0 nulls) and should be treated as the stable entity identifier throughout Phases 2–4.
+**Recommendation**: Use **`handle`** as the primary merge key for all enrichment operations. It is perfectly unique (0 collisions, 0 nulls) and should be treated as the stable entity identifier throughout Parts 2–4.
 
 `name + city + state` is the best human-readable / external-linkage key — adding city cuts the `name + state` collision rate by more than half (0.42% → 0.19%), halving the ambiguity for the micro/SMB tail where state-registered name uniqueness doesn't apply. The 51,064 nulls in key are driven entirely by missing `city` (~1.22% of records); `name` and `state` are both present in the valid-state population. Use this key when joining to external datasets or lookup sources that lack `handle` (e.g., spot-checking enriched output against web search). Do not use for automated merge-back.
 
@@ -612,7 +612,7 @@ The future-year (`founded > 2026`) NaN result from Section 6 is resolved: there 
 
 ## 8. SUSB State Coverage Comparison
 
-_Source: US Census Statistics of U.S. Businesses (SUSB) 2022 (`us_state_6digitnaics_2022.csv`) vs `us_companies.parquet` | Script: `src/phase1_comparator.py`_
+_Source: US Census Statistics of U.S. Businesses (SUSB) 2022 (`us_state_6digitnaics_2022.csv`) vs `part0_companies.parquet` | Script: `src/part1_comparator.py`_
 
 **SUSB** (Statistics of U.S. Businesses) counts employer firms — businesses with at least one W-2 employee — by state and NAICS sector. It is the primary government benchmark for US business universe coverage.
 
@@ -634,7 +634,7 @@ Coverage ratio = our records / SUSB firm count per state. Gap tiers: HIGH_GAP <1
 
 **Large Tier A states** (California, Texas, New York, Florida): 58%–73% — solid representation.
 
-**Implication**: State-level breadth is not the problem. The dataset has adequate geographic coverage across all 50 states + DC. Phase 2 gap detection should focus on **sub-state dimensions** — industry × state or size × state — not missing states.
+**Implication**: State-level breadth is not the problem. The dataset has adequate geographic coverage across all 50 states + DC. Part 2 gap detection should focus on **sub-state dimensions** — industry × state or size × state — not missing states.
 
 **Limitations**: SUSB counts legal "firms"; our data counts records (may include duplicates). Ratios are directional. SUSB 2022 vintage may not match our dataset vintage.
 
@@ -642,7 +642,7 @@ Coverage ratio = our records / SUSB firm count per state. Gap tiers: HIGH_GAP <1
 
 ## 9. SUSB Industry Coverage Comparison
 
-_Source: Statistics of U.S. Businesses (SUSB) 2022 national totals (State='00') vs `us_companies.parquet` | Script: `src/phase1_industry_mapper.py` | LLM: claude-haiku-4-5-20251001 ($0.01208)_
+_Source: Statistics of U.S. Businesses (SUSB) 2022 national totals (State='00') vs `part0_companies.parquet` | Script: `src/part1_industry_mapper.py` | LLM: claude-haiku-4-5-20251001 ($0.01208)_
 
 244 free-text industry labels (≥500 records each) were mapped to 20 NAICS 2-digit sectors via a single Claude Haiku call. Coverage = our records in that NAICS sector / SUSB national firm count.
 
@@ -656,7 +656,7 @@ _Source: Statistics of U.S. Businesses (SUSB) 2022 national totals (State='00') 
 | 72 | Accommodation & Food Services | 160,435 | 574,723 | **27.9%** |
 | 23 | Construction | 220,721 | 782,487 | **28.2%** |
 
-These five sectors collectively represent ~1.6M SUSB firms we have only partial coverage for. They are the **primary Phase 2 gap candidates**.
+These five sectors collectively represent ~1.6M SUSB firms we have only partial coverage for. They are the **primary Part 2 gap candidates**.
 
 ### Sectors at parity (ADEQUATE)
 
@@ -684,7 +684,7 @@ These five sectors collectively represent ~1.6M SUSB firms we have only partial 
 
 ## 10. SUSB + NES Combined Industry Coverage
 
-_Source: Statistics of U.S. Businesses (SUSB) 2022 (employer firms) + Nonemployer Statistics (NES) 2023 (non-employer establishments) vs `us_companies.parquet` | Script: `src/phase1_nes_comparator.py`_
+_Source: Statistics of U.S. Businesses (SUSB) 2022 (employer firms) + Nonemployer Statistics (NES) 2023 (non-employer establishments) vs `part0_companies.parquet` | Script: `src/part1_nes_comparator.py`_
 
 **NES** (Nonemployer Statistics) counts businesses with no paid employees — sole proprietors, self-employed individuals, and independent contractors. It captures ~30.4M entities that SUSB misses entirely. Adding NES to the SUSB denominator (~6.5M employer firms) produces a 36.9M total business universe. This changes the coverage picture significantly.
 
@@ -716,14 +716,14 @@ These sectors were ADEQUATE or MODERATE_GAP against SUSB alone, but are HIGH_GAP
 **Sectors remaining ADEQUATE after NES adjustment:**
 - Manufacturing (62.5%), Information (69.4%), Utilities (60.9%), Management of Companies (32.9%)
 
-**Implication for Phase 2**: The combined analysis sharpens the gap narrative considerably:
+**Implication for Part 2**: The combined analysis sharpens the gap narrative considerably:
 1. The dataset is well-calibrated for the employer-firm professional economy (Information, Finance, Professional Services at 15–70%)
 2. The genuine coverage gaps are in gig-economy/solo-operator sectors (Transportation 2%, Other Services 2.3%) and traditional physical economy (Construction 6%, Retail 6.3%)
 3. These are sourcing gaps — they cannot be closed by enriching existing records. Requires additional data sources (trade registers, state contractor licenses, gig platform exports)
 
 ---
 
-## Summary: What This Means for Phases 2–4
+## Summary: What This Means for Parts 2–4
 
 1. **Primary enrichment target**: `website` field (~910K missing). Closing this gap has the highest ROI for Sales Intelligence — a company without a website URL is effectively un-linkable to external data sources.
 
@@ -731,7 +731,7 @@ These sectors were ADEQUATE or MODERATE_GAP against SUSB alone, but are HIGH_GAP
 
 3. **Highest-priority states**: Iowa, Kansas, West Virginia, Mississippi, Arkansas (Tier B with worst avg fill). Tennessee and Oregon are the Tier A outliers worth targeting.
 
-4. **PoC sample spans all four size segments in a single run** (~300 records → 288 after handle dedup). Enterprise (500+) is oversampled to 20% of the sample despite being 1.65% of the population — gives the eval statistical power on the primary ICP. Mid-market, SMB, and churn-filtered micro each contribute ~27% so the cascade is stress-tested across the full distribution, not just the easy half. The strict `HIGH_CHURN_RISK` filter (Section 5b) excludes ~5,718 highest-risk micro records as a pre-filter; the remaining micro population stays in scope. Per-segment precision/recall in the Phase 4 eval is the actionable signal — it tells us which size bands the cascade is trustworthy for, rather than deferring 85% of the dataset to a Run 2 that might never ship. Enterprise records are structurally thin in the source data (only 1.65% at 500+) — that's a sourcing gap, not an enrichment issue.
+4. **PoC sample spans all four size segments in a single run** (~300 records → 288 after handle dedup). Enterprise (500+) is oversampled to 20% of the sample despite being 1.65% of the population — gives the eval statistical power on the primary ICP. Mid-market, SMB, and churn-filtered micro each contribute ~27% so the cascade is stress-tested across the full distribution, not just the easy half. The strict `HIGH_CHURN_RISK` filter (Section 5b) excludes ~5,718 highest-risk micro records as a pre-filter; the remaining micro population stays in scope. Per-segment precision/recall in the Part 4 eval is the actionable signal — it tells us which size bands the cascade is trustworthy for, rather than deferring 85% of the dataset to a Run 2 that might never ship. Enterprise records are structurally thin in the source data (only 1.65% at 500+) — that's a sourcing gap, not an enrichment issue.
 
 5. **Physical economy sectors are structurally under-represented**: Construction (6.0%), Retail (6.3%), Transportation (2.0%), Other Services (2.3%), and Admin/Support (3.6%) are all HIGH_GAP when measured against the full SUSB+NES universe. These gaps reflect the source platform's professional/digital bias — they are sourcing gaps, not enrichment opportunities.
 
@@ -745,7 +745,7 @@ These sectors were ADEQUATE or MODERATE_GAP against SUSB alone, but are HIGH_GAP
 
 ## 11. Extended Profiling Audit
 
-_Generated: 2026-06-12 | Script: ad-hoc DuckDB queries | Dataset: data/processed/us_companies.parquet | Scope: 4,164,063 US records_
+_Generated: 2026-06-12 | Script: ad-hoc DuckDB queries | Dataset: data/processed/part0_companies.parquet | Scope: 4,164,063 US records_
 
 ---
 
@@ -1017,9 +1017,9 @@ Top 5 Arabic examples:
 
 ---
 
-### 11. Phase 1.5 — Deterministic Cleanup Gate Results
+### 11. Part 1.5 — Deterministic Cleanup Gate Results
 
-**Executed**: 2026-06-13 | **Script**: `src/shared/rules.py` | **Input**: `us_companies.parquet` (4,306,855 records) | **Output**: `us_companies_clean.parquet`
+**Executed**: 2026-06-13 | **Script**: `src/shared/rules.py` | **Input**: `part0_companies.parquet` (4,306,855 records) | **Output**: `part0_companies_clean.parquet`
 
 Rules are non-destructive: the original parquet is never modified. Each output record carries a `rules_flags` column listing which rules fired (empty = no change). Total records modified: **132,463 of 4,306,855 (3.1%)**.
 
@@ -1078,11 +1078,11 @@ Note: `state_case_fix` recoveries (title-case normalisation, ~10,495 records per
 
 ---
 
-## 13. Phase 1.6 — Deterministic State×Industry Gap Detection
+## 13. Part 1.6 — Deterministic State×Industry Gap Detection
 
-_Generated: 2026-06-13 | Script: `src/phase1_gap_detection.py` | Source: `us_companies_clean.parquet` + SUSB 2022 | Output: `data/processed/gap_candidates.json`_
+_Generated: 2026-06-13 | Script: `src/part1_gap_detection.py` | Source: `part0_companies_clean.parquet` + SUSB 2022 | Output: `data/processed/part2_gap_candidates.json`_
 
-Cross-tab: `our_count / SUSB_count` per state×industry cell. Tier C states excluded. Industry labels mapped to NAICS sectors via `data/processed/industry_naics_mapping.json`. Records with null state excluded from denominators; logged separately as `state_unknown_high_value`.
+Cross-tab: `our_count / SUSB_count` per state×industry cell. Tier C states excluded. Industry labels mapped to NAICS sectors via `data/processed/part1_industry_naics_mapping.json`. Records with null state excluded from denominators; logged separately as `state_unknown_high_value`.
 
 ### Coverage scope
 
@@ -1132,11 +1132,11 @@ Wholesale Trade, Retail, Accommodation, Construction, and Admin/Support are MODE
 | 10K+ | 528 |
 | **Total (51+)** | **13,061** |
 
-13,061 mid-market and enterprise records have no recoverable state post-cleanup. Tagged as `state_unknown_high_value` in `gap_candidates.json`. Phase 4 should include these in enrichment without a state filter — their website/industry gaps are still addressable.
+13,061 mid-market and enterprise records have no recoverable state post-cleanup. Tagged as `state_unknown_high_value` in `part2_gap_candidates.json`. Part 4 should include these in enrichment without a state filter — their website/industry gaps are still addressable.
 
-### Phase 2 scope guidance
+### Part 2 scope guidance
 
-319 gap candidate cells is too many for Phase 2's $3 LLM budget to annotate exhaustively. Phase 2 data-engineer should prioritize:
+319 gap candidate cells is too many for Part 2's $3 LLM budget to annotate exhaustively. Part 2 data-engineer should prioritize:
 1. All 18 HIGH_GAP cells (especially the Tier A NJ and FL Other Services gaps)
 2. MODERATE_GAP cells in Tier A states for the five priority sectors (Construction, Retail, Wholesale Trade, Accommodation & Food, Other Services)
 
@@ -1146,9 +1146,9 @@ ADEQUATE sectors (Information, Finance, Professional Services, Health Care) can 
 
 ## 14. Commercial Significance Assessment
 
-_Added: 2026-06-13 | Context: Phase 1 findings reviewed against Firmable ICP and Sales Intelligence use cases_
+_Added: 2026-06-13 | Context: Part 1 findings reviewed against Firmable ICP and Sales Intelligence use cases_
 
-Not all gaps matter equally to clients. Below is a ranked commercial reading of the Phase 1.6 findings.
+Not all gaps matter equally to clients. Below is a ranked commercial reading of the Part 1.6 findings.
 
 ### Gaps that Firmable clients would feel daily
 
@@ -1162,7 +1162,7 @@ Same commercial exposure for brands, CPG companies, payment processors, and anyo
 Construction is a high-spend vertical for suppliers, equipment vendors, insurers, and fintech (construction lending). Territory-based field sales teams targeting this vertical are missing a significant slice.
 
 **4. 13,061 mid-market/enterprise records with null state (post-cleanup)**
-Quietly the most severe quality issue for Sales Intelligence. These are 51+ employee companies — the highest-value accounts — with no geographic anchor. They are invisible to territory-based filtering, regional health scoring, and geo-targeted outreach. See Section 1c and `gap_candidates.json` → `state_unknown_high_value`.
+Quietly the most severe quality issue for Sales Intelligence. These are 51+ employee companies — the highest-value accounts — with no geographic anchor. They are invisible to territory-based filtering, regional health scoring, and geo-targeted outreach. See Section 1c and `part2_gap_candidates.json` → `state_unknown_high_value`.
 
 **5. Delaware / Management of Companies — 4.9% coverage (HIGH_GAP)**
 Delaware is the incorporation state for holding companies, PE-backed entities, and corporate HQ structures. With only 23 of 466 SUSB establishments captured, clients doing corporate-group mapping or PE deal sourcing are nearly blind in the state that matters most for that use case.
@@ -1171,7 +1171,7 @@ Delaware is the incorporation state for holding companies, PE-backed entities, a
 
 **Other Services HIGH_GAP (17 states, <10% coverage)**: NAICS 81 includes auto repair, personal care, pet services — dominated by micro-businesses and sole operators. The SUSB benchmark overcounts here because it includes gig-economy operators that Sales Intelligence clients typically do not prospect. The gap is real but the commercial exposure is low. Verify against NES before ranking this above the Wholesale/Retail/Construction gaps.
 
-### Recommended commercial priority order for Phase 3
+### Recommended commercial priority order for Part 3
 
 1. Wholesale Trade (nationwide, all client verticals)
 2. Retail Trade (41 states, high-volume ICP)

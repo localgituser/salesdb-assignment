@@ -1,6 +1,6 @@
 # Audit Prompt v1 — Commercial Relevance & Enrichment Approach
 # Model: claude-haiku-4-5-20251001
-# Phase: phase_2
+# Part: part_2
 # Inputs: actionable_sectors_json, size_quality_json, sourcing_limit_sectors_json
 # Output: ranked sectors with commercial_relevance + enrichment_approach + size gap finding
 
@@ -25,7 +25,7 @@ You also have size-dimension quality data to assess separately.
 
 {{ACTIONABLE_SECTORS_JSON}}
 
-## Size Dimension Quality Data (from us_companies_clean.parquet)
+## Size Dimension Quality Data (from part0_companies_clean.parquet)
 
 {{SIZE_QUALITY_JSON}}
 

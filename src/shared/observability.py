@@ -9,8 +9,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-LOG_FILE = "data/processed/observability.jsonl"
-COST_TRACKING_FILE = "data/processed/cost_tracking.json"
+LOG_FILE = "data/processed/shared_observability.jsonl"
+COST_TRACKING_FILE = "data/processed/shared_cost_tracking.json"
 
 
 class ObservabilityLogger:
@@ -85,8 +85,8 @@ class ObservabilityLogger:
 
     @classmethod
     def sync_from_jsonl(cls, log_file: str = LOG_FILE) -> None:
-        """Rebuild cost_tracking.json from scratch by scanning observability.jsonl.
-        Use for initialization and recovery when cost_tracking.json is missing or stale."""
+        """Rebuild shared_cost_tracking.json from scratch by scanning shared_observability.jsonl.
+        Use for initialization and recovery when shared_cost_tracking.json is missing or stale."""
         if not os.path.exists(log_file):
             return
 

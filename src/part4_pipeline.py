@@ -1,5 +1,5 @@
 """
-Phase 4 PoC enrichment pipeline.
+Part 4 PoC enrichment pipeline.
 Cascade: rules → search → Haiku verify → Sonnet fallback.
 """
 
@@ -17,8 +17,8 @@ from src.part4_gate import (
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, stream=sys.stderr)
 
-BATCH_PATH = "data/processed/sample_audit.parquet"
-ENRICHED_PATH = "data/enriched/poc_enriched_sample.parquet"
+BATCH_PATH = "data/processed/part1_sample_audit.parquet"
+ENRICHED_PATH = "data/enriched/part4_enriched_sample.parquet"
 
 
 def run_part4() -> None:

@@ -1,5 +1,5 @@
 # Part 3 — Commercial Framing & Prioritisation
-_Status: gaps sourced from `docs/part2-audit.md` (Phase 2 verifier output). ICE scores and top-2 selection written after Phase 4._
+_Status: gaps sourced from `docs/part2-audit.md` (Part 2 verifier output). ICE scores and top-2 selection written after Part 4._
 
 ---
 

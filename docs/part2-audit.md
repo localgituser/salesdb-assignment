@@ -1,8 +1,8 @@
-# Phase 2 — Agentic Coverage & Quality Audit Findings
+# Part 2 — Agentic Coverage & Quality Audit Findings
 _Generated: 2026-06-15 02:17 UTC_
 _Models: claude-haiku-4-5-20251001 (sector ranking) + claude-sonnet-4-6 (synthesis)_
 _Prompt versions: audit_v1 / audit_synthesis_v1_
-_Phase 2 LLM cost: $0.3653_
+_Part 2 LLM cost: $0.3653_
 _Spot-check: n=15 per gap, pure SQL, no LLM_
 
 ---
@@ -67,7 +67,7 @@ _Spot-check: n=15 per gap, pure SQL, no LLM_
 **Commercial impact**: Enterprise AEs and account-based marketing teams targeting holding companies, large manufacturers, and multi-site operators find an addressable universe that is too small to run meaningful ABM programs; this is a direct churn and expansion risk for enterprise-tier customers.
 **Enrichment approach**: Source net-new enterprise firms via SEC filings (10-K, proxy statements), D&B and Refinitiv company registries, and corporate hierarchy databases to expand the enterprise record pool independent of fill-rate improvements.
 **Agent confidence**: 0.88 — The gap is clearly evidenced by the 1.65% share figure, but the exact size of the recoverable universe is uncertain because enterprise firm counts are inherently small and some firms may already be captured under subsidiary or DBA records.
-**Verifier verdict**: ~ PLAUSIBLE — Size-dimension gap — no NAICS code; verified via Phase 1 size quality summary (enterprise 1.65% of records, website fill 80.9%). SQL spot-check not applicable.
+**Verifier verdict**: ~ PLAUSIBLE — Size-dimension gap — no NAICS code; verified via Part 1 size quality summary (enterprise 1.65% of records, website fill 80.9%). SQL spot-check not applicable.
 
 #### Gap 5: Micro-firm records (1–10 employees) in truck transportation (17,208 records, 58.1% website fill) and restaurants (21,723 records, 56.7% website fill) represent the worst-performing industry×size intersections in the platform, with roughly 4 in 10 records in each cohort lacking a website — degrading deliverability and contact quality for the exact SMB segments where Transportation and Accommodation gaps are most acute.
 
@@ -81,13 +81,13 @@ _Spot-check: n=15 per gap, pure SQL, no LLM_
 
 **Cross-gap pattern**: Four of the five gaps share a common root: the platform's sourcing pipelines have not systematically tapped public regulatory registries (FMCSA, state licensing boards, franchise filings, SEC) that contain dense, employer-level firm signals in exactly the sectors and size bands most valued by B2B buyers. The fifth gap (enterprise sourcing volume) reflects a deliberate or implicit SMB-first ingestion posture that leaves the highest-value size band structurally underrepresented regardless of fill-rate quality.
 
-**Recommended Phase 4 target**: construction_national_sourcing — state contractor licensing boards provide the most actionable, publicly available, employer-firm-level data across all 48 gap states with no structural NES inflation ceiling, the commercial buyer base (GCs, subs, material suppliers) is well-defined and high-velocity, and the 28.0% SUSB employer coverage figure confirms a large recoverable population that a focused registry ingestion sprint could materially close within a single quarter.
+**Recommended Part 4 target**: construction_national_sourcing — state contractor licensing boards provide the most actionable, publicly available, employer-firm-level data across all 48 gap states with no structural NES inflation ceiling, the commercial buyer base (GCs, subs, material suppliers) is well-defined and high-velocity, and the 28.0% SUSB employer coverage figure confirms a large recoverable population that a focused registry ingestion sprint could materially close within a single quarter.
 
 ---
 
 ## Verifier Spot-Check Detail
 
-Each gap independently re-derived from `us_companies_clean.parquet` via SQL. n=15 per gap. No LLM calls in this section.
+Each gap independently re-derived from `part0_companies_clean.parquet` via SQL. n=15 per gap. No LLM calls in this section.
 
 ### Gap 1 Spot-Check: Transportation and Warehousing (NAICS 48-49)
 
@@ -102,14 +102,14 @@ Each gap independently re-derived from `us_companies_clean.parquet` via SQL. n=1
 
 ```sql
 SELECT COUNT(*) as cnt
-        FROM read_parquet('/Users/kunal/code/salesdb-assignment/data/processed/us_companies_clean.parquet')
+        FROM read_parquet('/Users/kunal/code/salesdb-assignment/data/processed/part0_companies_clean.parquet')
         WHERE state IS NOT NULL
           AND industry IN ('airlines and aviation', 'freight and package transportation', 'maritime', 'maritime transportation', 'transportation, logistics, supply chain and storage', 'transportation/trucking/railroad', 'truck transportation', 'warehousing', 'warehousing and storage')
 ```
 
 ```sql
 SELECT handle, name, city, state, industry, size, website, founded, type
-        FROM read_parquet('/Users/kunal/code/salesdb-assignment/data/processed/us_companies_clean.parquet')
+        FROM read_parquet('/Users/kunal/code/salesdb-assignment/data/processed/part0_companies_clean.parquet')
         WHERE state IS NOT NULL
           AND industry IN ('airlines and aviation', 'freight and package transportation', 'maritime', 'maritime transportation', 'transportation, logistics, supply chain and storage', 'transportation/trucking/railroad', 'truck transportation', 'warehousing', 'warehousing and storage')
         ORDER BY hash(handle || 'phase2_verify_seed')
@@ -131,14 +131,14 @@ SELECT handle, name, city, state, industry, size, website, founded, type
 
 ```sql
 SELECT COUNT(*) as cnt
-        FROM read_parquet('/Users/kunal/code/salesdb-assignment/data/processed/us_companies_clean.parquet')
+        FROM read_parquet('/Users/kunal/code/salesdb-assignment/data/processed/part0_companies_clean.parquet')
         WHERE state IS NOT NULL
           AND industry IN ('building construction', 'construction', 'residential building construction', 'specialty trade contractors')
 ```
 
 ```sql
 SELECT handle, name, city, state, industry, size, website, founded, type
-        FROM read_parquet('/Users/kunal/code/salesdb-assignment/data/processed/us_companies_clean.parquet')
+        FROM read_parquet('/Users/kunal/code/salesdb-assignment/data/processed/part0_companies_clean.parquet')
         WHERE state IS NOT NULL
           AND industry IN ('building construction', 'construction', 'residential building construction', 'specialty trade contractors')
         ORDER BY hash(handle || 'phase2_verify_seed')
@@ -160,14 +160,14 @@ SELECT handle, name, city, state, industry, size, website, founded, type
 
 ```sql
 SELECT COUNT(*) as cnt
-        FROM read_parquet('/Users/kunal/code/salesdb-assignment/data/processed/us_companies_clean.parquet')
+        FROM read_parquet('/Users/kunal/code/salesdb-assignment/data/processed/part0_companies_clean.parquet')
         WHERE state IS NOT NULL
           AND industry IN ('arts & crafts', 'consumer goods', 'food and beverage retail', 'furniture', 'luxury goods & jewelry', 'online and mail order retail', 'retail', 'retail apparel and fashion', 'retail art supplies', 'retail furniture and home furnishings', 'retail groceries', 'retail health and personal care products', 'retail luxury goods and jewelry', 'retail motor vehicles', 'retail office equipment')
 ```
 
 ```sql
 SELECT handle, name, city, state, industry, size, website, founded, type
-        FROM read_parquet('/Users/kunal/code/salesdb-assignment/data/processed/us_companies_clean.parquet')
+        FROM read_parquet('/Users/kunal/code/salesdb-assignment/data/processed/part0_companies_clean.parquet')
         WHERE state IS NOT NULL
           AND industry IN ('arts & crafts', 'consumer goods', 'food and beverage retail', 'furniture', 'luxury goods & jewelry', 'online and mail order retail', 'retail', 'retail apparel and fashion', 'retail art supplies', 'retail furniture and home furnishings', 'retail groceries', 'retail health and personal care products', 'retail luxury goods and jewelry', 'retail motor vehicles', 'retail office equipment')
         ORDER BY hash(handle || 'phase2_verify_seed')
@@ -183,7 +183,7 @@ SELECT handle, name, city, state, industry, size, website, founded, type
 - Sample fill rates (n=0): website=N/A%, industry=N/A%, size=N/A%
 - State distribution: {}
 - Size distribution: {}
-- **Verdict**: PLAUSIBLE — Size-dimension gap — no NAICS code; verified via Phase 1 size quality summary (enterprise 1.65% of records, website fill 80.9%). SQL spot-check not applicable.
+- **Verdict**: PLAUSIBLE — Size-dimension gap — no NAICS code; verified via Part 1 size quality summary (enterprise 1.65% of records, website fill 80.9%). SQL spot-check not applicable.
 
 <details><summary>Sampling methodology (SQL — reproducible with the dataset)</summary>
 
@@ -210,14 +210,14 @@ SELECT handle, name, city, state, industry, size, website, founded, type
 
 ```sql
 SELECT COUNT(*) as cnt
-        FROM read_parquet('/Users/kunal/code/salesdb-assignment/data/processed/us_companies_clean.parquet')
+        FROM read_parquet('/Users/kunal/code/salesdb-assignment/data/processed/part0_companies_clean.parquet')
         WHERE state IS NOT NULL
           AND industry IN ('airlines and aviation', 'freight and package transportation', 'maritime', 'maritime transportation', 'transportation, logistics, supply chain and storage', 'transportation/trucking/railroad', 'truck transportation', 'warehousing', 'warehousing and storage')
 ```
 
 ```sql
 SELECT handle, name, city, state, industry, size, website, founded, type
-        FROM read_parquet('/Users/kunal/code/salesdb-assignment/data/processed/us_companies_clean.parquet')
+        FROM read_parquet('/Users/kunal/code/salesdb-assignment/data/processed/part0_companies_clean.parquet')
         WHERE state IS NOT NULL
           AND industry IN ('airlines and aviation', 'freight and package transportation', 'maritime', 'maritime transportation', 'transportation, logistics, supply chain and storage', 'transportation/trucking/railroad', 'truck transportation', 'warehousing', 'warehousing and storage')
         ORDER BY hash(handle || 'phase2_verify_seed')
@@ -244,11 +244,11 @@ Sampled from top-5 gap sectors, stratified by state (10 worst-covered Tier A + 5
 
 ## Trust Calibration Note
 
-The data-engineer (Haiku + Sonnet) produced sector rankings and gap narratives from pre-aggregated statistics in `gap_candidates.json`. The verifier independently re-derived each top-5 finding from raw `us_companies_clean.parquet` via SQL (n=15 per gap). Verdicts above reflect the verifier's independent assessment.
+The data-engineer (Haiku + Sonnet) produced sector rankings and gap narratives from pre-aggregated statistics in `part2_gap_candidates.json`. The verifier independently re-derived each top-5 finding from raw `part0_companies_clean.parquet` via SQL (n=15 per gap). Verdicts above reflect the verifier's independent assessment.
 
 Known methodological limits:
 - NES non-employer comparator inflates gaps in sole-proprietor-heavy sectors (Transportation, Other Services, Admin & Support).
-- Industry labels in our dataset map to NAICS via `industry_naics_mapping.json` (244 labels mapped); unmapped labels are excluded from sector counts.
+- Industry labels in our dataset map to NAICS via `part1_industry_naics_mapping.json` (244 labels mapped); unmapped labels are excluded from sector counts.
 - Confidence scores are agent-estimated, not statistically derived.
 - **Record-level quality pass is plausibility-only, not ground-truth verification.** The Haiku audit flags issues based on name–website–industry coherence within the record. It cannot confirm whether a website actually belongs to this specific entity, whether the domain is live, or whether the industry label was applied correctly at ingestion. Issue counts above are directional signals, not measured error rates.
-- **Dataset is approximately 3 years old** (sourced circa 2022–2023 based on SUSB 2022 / NES 2023 comparators). Websites change, companies close, and industry classifications shift. A significant share of "clean" records by current standards may now be stale. This makes a Google Places API run a natural first step in Phase 4: it serves dual purpose — enriching missing website/category fields for gap sectors *and* validating the accuracy of existing records against current business state. Partial, verified data is preferable to high-volume data of unknown freshness.
+- **Dataset is approximately 3 years old** (sourced circa 2022–2023 based on SUSB 2022 / NES 2023 comparators). Websites change, companies close, and industry classifications shift. A significant share of "clean" records by current standards may now be stale. This makes a Google Places API run a natural first step in Part 4: it serves dual purpose — enriching missing website/category fields for gap sectors *and* validating the accuracy of existing records against current business state. Partial, verified data is preferable to high-volume data of unknown freshness.

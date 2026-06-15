@@ -52,14 +52,14 @@ All Stage 1 inputs, plus:
 | Artifact | Path | Description |
 |---|---|---|
 | Baseline observations | `notes/part1_baseline_observations.md` | Human-readable audit with fill-rate tables, tier distribution, null pattern classification, quality flags |
-| Profiling summary | `data/processed/profiling_summary.json` | Machine-readable counts for each finding — used by `src/rules.py` |
-| Stratified audit sample | `data/processed/sample_audit.parquet` | Stratified sample for Phase 2 and Phase 4 (see Sampling Strategy below) |
+| Profiling summary | `data/processed/part1_profiling_summary.json` | Machine-readable counts for each finding — used by `src/rules.py` |
+| Stratified audit sample | `data/processed/part1_sample_audit.parquet` | Stratified sample for Phase 2 and Phase 4 (see Sampling Strategy below) |
 
 ### Stage 2 outputs
 
 | Artifact | Path | Description |
 |---|---|---|
-| Gap candidates | `data/processed/gap_candidates.json` | **Unranked** candidate list. Schema per record: `{gap_id, dimension, slice, our_records, comparator_records, comparator_source, coverage_pct, tier, confidence, status: "unverified", caveats[]}`. See `.claude/agents/data-engineer.md` for field definitions. Ranking happens downstream in the verifier. |
+| Gap candidates | `data/processed/part2_gap_candidates.json` | **Unranked** candidate list. Schema per record: `{gap_id, dimension, slice, our_records, comparator_records, comparator_source, coverage_pct, tier, confidence, status: "unverified", caveats[]}`. See `.claude/agents/data-engineer.md` for field definitions. Ranking happens downstream in the verifier. |
 | Gap findings (verified) | `notes/gap_findings.md` | Final ranked list after verifier spot-check — do not write directly, this is the verifier's output |
 
 ---
@@ -74,9 +74,9 @@ All Stage 1 inputs, plus:
 
 **Invocation pattern** (Claude Code):
 ```
-Use the data-profiler subagent for Stage 1 coverage audit on data/processed/us_companies.parquet
+Use the data-profiler subagent for Stage 1 coverage audit on data/processed/part0_companies.parquet
 Use the data-engineer subagent for Stage 2 gap detection against data/raw/us_state_6digitnaics_2022.csv
-Use the verifier subagent to spot-check the gap candidates in data/processed/gap_candidates.json
+Use the verifier subagent to spot-check the gap candidates in data/processed/part2_gap_candidates.json
 ```
 
 ---
@@ -170,7 +170,7 @@ Within each geography, stratify by industry sector (proportional) and over-sampl
 
 ```
 Use the data-profiler subagent for Stage 1 coverage audit.
-Dataset: data/processed/us_companies.parquet
+Dataset: data/processed/part0_companies.parquet
 Geography column: state
 Size column: size
 Industry column: industry
@@ -183,7 +183,7 @@ Use the data-engineer subagent for Stage 2 gap detection.
 SUSB comparator: data/raw/us_state_6digitnaics_2022.csv (employer firms, susb_csv format)
 NES comparator: data/raw/nonemp23st.txt (non-employer, nes_txt format)
 Run both comparators and report combined gap tier per sector.
-Output to data/processed/gap_candidates.json
+Output to data/processed/part2_gap_candidates.json
 ```
 
 ### Stage 1 key findings
@@ -200,7 +200,7 @@ Worst-coverage geographies: Iowa (81.9% avg fill), Kansas (83.5%), West Virginia
 
 ### Stage 2 key findings (SUSB + NES combined) — post-verifier ranked output
 
-Engineer outputs `gap_candidates.json` unranked. The table below is the verifier's ranked top-N after spot-check, written to `notes/gap_findings.md`.
+Engineer outputs `part2_gap_candidates.json` unranked. The table below is the verifier's ranked top-N after spot-check, written to `notes/gap_findings.md`.
 
 | Sector | Combined coverage | Gap tier | Enrichable? |
 |---|---|---|---|

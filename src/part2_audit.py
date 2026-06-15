@@ -1,7 +1,7 @@
 """
 Part 2 — Agentic Coverage & Quality Audit (data-engineer role)
 
-Reads gap_candidates.json + queries us_companies_clean.parquet, then calls:
+Reads part2_gap_candidates.json + queries part0_companies_clean.parquet, then calls:
   1. Haiku  — commercial relevance + enrichment approach for actionable sectors
               (NES-dominated SOURCING_LIMIT sectors pre-filtered deterministically)
   2. Sonnet — top-5 narrative synthesis across industry + size dimensions
@@ -14,8 +14,8 @@ steps 1 and 2 are skipped (idempotent) and only the record audit is re-run.
 
 Writes:
   data/processed/part2_audit_raw.json    — raw LLM outputs + all pre-computed summaries
-  data/processed/observability.jsonl     — per-call trace entries
-  data/processed/cost_tracking.json      — running total update
+  data/processed/shared_observability.jsonl     — per-call trace entries
+  data/processed/shared_cost_tracking.json      — running total update
 
 Does NOT write gap_findings.md — that is the verifier's job after spot-checking.
 """
@@ -57,8 +57,8 @@ PART2_BUDGET = CONFIG.budget.per_part_usd.get("part_2", 3.0)
 
 PROMPTS_DIR = Path(__file__).parent.parent / "prompts"
 PROCESSED_DIR = Path(__file__).parent.parent / "data" / "processed"
-CLEAN_PARQUET = PROCESSED_DIR / "us_companies_clean.parquet"
-GAP_CANDIDATES_PATH = PROCESSED_DIR / "gap_candidates.json"
+CLEAN_PARQUET = PROCESSED_DIR / "part0_companies_clean.parquet"
+GAP_CANDIDATES_PATH = PROCESSED_DIR / "part2_gap_candidates.json"
 AUDIT_RAW_PATH = PROCESSED_DIR / "part2_audit_raw.json"
 
 
@@ -151,7 +151,7 @@ def build_sector_summary(all_cells: list[dict]) -> tuple[list[dict], list[dict]]
 
 def build_size_quality_summary(con: duckdb.DuckDBPyConnection) -> dict:
     """
-    Query us_companies_clean.parquet for size-dimension quality metrics.
+    Query part0_companies_clean.parquet for size-dimension quality metrics.
     Returns structured summary for the Haiku prompt.
     """
     segment_sql = f"""
@@ -304,14 +304,14 @@ def build_top5_sector_detail(gap_candidates: list[dict], top5_codes: list[str]) 
     return result
 
 
-INDUSTRY_MAPPING_PATH = PROCESSED_DIR / "industry_naics_mapping.json"
+INDUSTRY_MAPPING_PATH = PROCESSED_DIR / "part1_industry_naics_mapping.json"
 RECORD_AUDIT_N = CONFIG.eval.record_audit_n_per_gap
 RECORD_AUDIT_BATCH = 10
 EXCLUDED_TERRITORIES = set(CONFIG.market.excluded_territories)
 
 
 def load_naics_labels() -> dict:
-    """Load industry_naics_mapping.json and invert to {naics_code: [labels]}."""
+    """Load part1_industry_naics_mapping.json and invert to {naics_code: [labels]}."""
     if not INDUSTRY_MAPPING_PATH.exists():
         return {}
     with open(INDUSTRY_MAPPING_PATH) as f:
@@ -513,7 +513,7 @@ def run_record_quality_audit(
 
 
 def main():
-    logger.info("Phase 2 audit starting")
+    logger.info("Part 2 audit starting")
     obs = ObservabilityLogger()
     client = anthropic.Anthropic()
     con = duckdb.connect()
@@ -523,7 +523,7 @@ def main():
     gap_candidates = data.get("gap_candidates", [])
 
     if not all_cells:
-        logger.error("all_cells missing from gap_candidates.json — cannot build sector summary")
+        logger.error("all_cells missing from part2_gap_candidates.json — cannot build sector summary")
         sys.exit(1)
 
     # --- Skip sector ranking/synthesis if already run (idempotent) ---

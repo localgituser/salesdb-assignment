@@ -2,11 +2,11 @@
 
 **Brief source of truth**: `docs/PROJECT-GUIDELINES.md`
 
-Each phase below maps explicitly to its corresponding Part in the brief. Both use Part numbering (0–6) is what the assessors evaluate.
+Each part below maps explicitly to its corresponding Part in the brief. Part numbering (0–6) is what the assessors evaluate.
 
-Total time budget: ~2-3 working days. Part 4 / Phase 4 gets the largest single share. If running behind, cut from the bottom of the priority list (Part 5 → Part 3 → Part 2), never from Part 4 or Part 6.
+Total time budget: ~2-3 working days. Part 4 gets the largest single share. If running behind, cut from the bottom of the priority list (Part 5 → Part 3 → Part 2), never from Part 4 or Part 6.
 
-LLM budget: **self-imposed $10 ceiling** (the brief sets no budget — this is a discipline constraint). Per-phase caps live in `config/project.yaml` → `budget.per_part_usd`. The part headers below mirror those values; if they diverge, the YAML wins. If a part's sub-budget is exhausted, stop that phase's LLM calls, log it, and move on — never let an early overrun block Part 4.
+LLM budget: **self-imposed $10 ceiling** (the brief sets no budget — this is a discipline constraint). Per-part caps live in `config/project.yaml` → `budget.per_part_usd`. The part headers below mirror those values; if they diverge, the YAML wins. If a part's sub-budget is exhausted, stop that part's LLM calls, log it, and move on — never let an early overrun block Part 4.
 
 **Tunable parameters** (gap-tier thresholds, geography tier cutoffs, platform blocklist, cascade thresholds, batch size limits, run scope, market dataset/comparator paths) all live in `config/project.yaml`. To rerun this plan against a different market, edit that YAML — no code changes required.
 
@@ -20,14 +20,14 @@ LLM budget: **self-imposed $10 ceiling** (the brief sets no budget — this is a
 ├── data/
 │   ├── raw/
 │   ├── processed/
-│   │   ├── us_companies.parquet        # Part 0 output (raw, never modified)
-│   │   ├── us_companies_clean.parquet  # Part 1.5 output (rules-cleaned)
-│   │   ├── sample_audit.parquet        # Part 1 stratified sample
-│   │   ├── gap_candidates.json         # Part 1.6 output (annotated by Part 2 data-engineer)
-│   │   ├── observability.jsonl         # all LLM call traces
-│   │   └── cost_tracking.json          # running cost totals
+│   │   ├── part0_companies.parquet        # Part 0 output (raw, never modified)
+│   │   ├── part0_companies_clean.parquet  # Part 1.5 output (rules-cleaned)
+│   │   ├── part1_sample_audit.parquet        # Part 1 stratified sample
+│   │   ├── part2_gap_candidates.json         # Part 1.6 output (annotated by Part 2 data-engineer)
+│   │   ├── shared_observability.jsonl         # all LLM call traces
+│   │   └── shared_cost_tracking.json          # running cost totals
 │   └── enriched/
-│       └── poc_enriched_sample.parquet # Part 4 output
+│       └── part4_enriched_sample.parquet # Part 4 output
 ├── src/
 │   ├── shared/               # config.py, observability.py, rules.py
 │   ├── part0_ingestion.py
@@ -35,7 +35,7 @@ LLM budget: **self-imposed $10 ceiling** (the brief sets no budget — this is a
 │   ├── part1_sampling.py
 │   ├── part1_comparator.py   # SUSB state-level comparison
 │   ├── part1_nes_comparator.py  # SUSB+NES combined industry comparison
-│   ├── part1_gap_detection.py   # Part 1.6 state×industry cross-tab → gap_candidates.json
+│   ├── part1_gap_detection.py   # Part 1.6 state×industry cross-tab → part2_gap_candidates.json
 │   ├── part1_industry_mapper.py
 │   ├── part2_audit.py        # Part 2 data-engineer role
 │   ├── part2_verify.py       # Part 2 verifier role
@@ -75,12 +75,12 @@ LLM budget: **self-imposed $10 ceiling** (the brief sets no budget — this is a
 Target: 30 min | Budget: $0
 
 - Scaffold repo structure above.
-- Load 4.25M dataset into DuckDB → Parquet (`data/processed/us_companies.parquet`).
+- Load 4.25M dataset into DuckDB → Parquet (`data/processed/part0_companies.parquet`).
 - Pull external comparators: **SUSB 2022** (Statistics of U.S. Businesses — employer firms) + **NES 2023** (Nonemployer Statistics — sole proprietors/self-employed). Combined ~36.9M business universe.
 - **Census CBP rejected**: CBP counts physical establishment locations, not legal companies. A multi-location company appears as N CBP records but 1 SUSB record — wrong denominator for a company-level audit.
 - **5-minute sanity check only**: do state codes match format-wise? Are comparator numbers in the right order of magnitude? Note any mismatch in one sentence in `baseline_audit.md`.
 - **External augmentation decision (state once, don't revisit)**: Decision for this submission: use SUSB + NES as the sole comparators (free, stable, no scraping risk). Tradeoff: NES 2023 / SUSB 2022 vintage mismatch means ratios are directional only; NES counts legal entities, our dataset may count practitioners individually. Documented in `docs/part0-discovery.md`.
-- Set up `src/shared/observability.py`: JSONL logger (timestamp, phase, model, tokens, cost, prompt_version, outcome) + running cost total written to `data/processed/cost_tracking.json`, checked at the start of each LLM part script.
+- Set up `src/shared/observability.py`: JSONL logger (timestamp, part, model, tokens, cost, prompt_version, outcome) + running cost total written to `data/processed/shared_cost_tracking.json`, checked at the start of each LLM part script.
 
 **Output:** working DuckDB/Parquet pipeline, logger stub, one-paragraph comparator note with augmentation decision.
 
@@ -108,11 +108,11 @@ Write `baseline_audit.md`:
 - sampling/stratification approach (1 paragraph) — including *why* 15-record spot-checks per gap give a defensible signal (at expected gap prevalence ≥20%, n=15 yields ~95% power to detect the gap above noise)
 - coverage parity definition: which attributes (name, website, industry, employee range, location), at what fill rates (e.g. ≥85% for name/state, ≥60% for website), at what accuracy standard, and how this varies by state tier (Tier A = full parity target, Tier B = directional target, Tier C = excluded)
 
-**Part 1.5 — Deterministic Cleanup Gate** (no LLM, $0): Run `src/shared/rules.py` before Part 2 to produce `us_companies_clean.parquet`. Rules: state normalisation (case, abbreviation, city-leak recombine), website platform/institutional-TLD reclassification, founded pre-1800 null-out, name garbage/sentinel null-out, city junk null-out. Adds `rules_flags` column + three boolean flag columns (`has_non_latin_name`, `implausible_size_founded`, `has_shared_domain`). All Part 2–4 scripts read from the clean parquet, not the raw one.
+**Part 1.5 — Deterministic Cleanup Gate** (no LLM, $0): Run `src/shared/rules.py` before Part 2 to produce `part0_companies_clean.parquet`. Rules: state normalisation (case, abbreviation, city-leak recombine), website platform/institutional-TLD reclassification, founded pre-1800 null-out, name garbage/sentinel null-out, city junk null-out. Adds `rules_flags` column + three boolean flag columns (`has_non_latin_name`, `implausible_size_founded`, `has_shared_domain`). All Part 2–4 scripts read from the clean parquet, not the raw one.
 
-**Part 1.6 — Deterministic Gap Detection** (no LLM, $0): Run `src/part1_gap_detection.py` to produce the ranked gap candidate list via pure arithmetic — `our_count / SUSB_count` per state×industry and state×size band. Output: `data/processed/gap_candidates.json` (gap tier per cell: HIGH/MODERATE/ADEQUATE). This is SQL/Python only; no judgment calls. Part 2 consumes this file as input — it does not re-derive gaps from SUSB.
+**Part 1.6 — Deterministic Gap Detection** (no LLM, $0): Run `src/part1_gap_detection.py` to produce the ranked gap candidate list via pure arithmetic — `our_count / SUSB_count` per state×industry and state×size band. Output: `data/processed/part2_gap_candidates.json` (gap tier per cell: HIGH/MODERATE/ADEQUATE). This is SQL/Python only; no judgment calls. Part 2 consumes this file as input — it does not re-derive gaps from SUSB.
 
-**Output:** `baseline_audit.md`, `data/processed/sample_audit.parquet`, `data/processed/us_companies_clean.parquet`, `data/processed/gap_candidates.json`
+**Output:** `baseline_audit.md`, `data/processed/part1_sample_audit.parquet`, `data/processed/part0_companies_clean.parquet`, `data/processed/part2_gap_candidates.json`
 
 ---
 
@@ -122,13 +122,13 @@ Target: 2-3 hrs | Budget: $3
 
 **Separation of roles is the point here** — the brief explicitly tests trust calibration. The deterministic gap list already exists from Part 1.6; Part 2 is purely LLM judgment and spot-checks on top of it.
 
-- **Input**: `data/processed/gap_candidates.json` (from Part 1.6). Do not re-derive gaps from SUSB — that work is done.
-- **data-engineer subagent**: for each gap candidate, uses LLM to add commercial reasoning, assess whether the gap is a sourcing gap vs. enrichment opportunity, and assign a confidence score. Annotates `gap_candidates.json` in-place (adds `reasoning`, `gap_type`, `confidence` fields).
+- **Input**: `data/processed/part2_gap_candidates.json` (from Part 1.6). Do not re-derive gaps from SUSB — that work is done.
+- **data-engineer subagent**: for each gap candidate, uses LLM to add commercial reasoning, assess whether the gap is a sourcing gap vs. enrichment opportunity, and assign a confidence score. Annotates `part2_gap_candidates.json` in-place (adds `reasoning`, `gap_type`, `confidence` fields).
 - **verifier subagent**: independently spot-checks 15 records per candidate gap against raw data. Produces `docs/part2-audit.md`.
-- Every model call logged to `data/processed/observability.jsonl` (prompt_version, model, latency, cost, outcome). This is the submission's trace artifact.
+- Every model call logged to `data/processed/shared_observability.jsonl` (prompt_version, model, latency, cost, outcome). This is the submission's trace artifact.
 - `gap_findings.md` must contain, per gap: what's missing, prevalence, confidence, "agent claimed X / spot-check found Y" — even when they agree. Silent agreement suppresses a useful signal.
 
-**Output:** `docs/part2-audit.md`, annotated `data/processed/gap_candidates.json`, traces in `data/processed/observability.jsonl`
+**Output:** `docs/part2-audit.md`, annotated `data/processed/part2_gap_candidates.json`, traces in `data/processed/shared_observability.jsonl`
 
 ---
 
@@ -166,13 +166,13 @@ Build cascade in `src/part4_pipeline.py`. **Fill this table in before writing co
 
 - Structured output per record: enriched fields + `confidence` score + `stage_resolved` + `status`
 - Rule layer (Stage 1) must run before any model call — no exceptions
-- Run on 200-1000 records → `data/enriched/poc_enriched_sample.parquet`
+- Run on 200-1000 records → `data/enriched/part4_enriched_sample.parquet`
 
 ### Eval (included in above block)
 - Hand-label **20-25 records** → `evals/ground_truth.json` (static, never regenerated programmatically)
 - `eval_runner.py`: precision/recall, no LLM calls. One number + one paragraph on weakness.
 
-**Output:** `poc_enriched_sample.parquet`, `eval_runner.py`, `ground_truth.json`, precision/recall number + paragraph
+**Output:** `part4_enriched_sample.parquet`, `eval_runner.py`, `ground_truth.json`, precision/recall number + paragraph
 
 ---
 
@@ -213,7 +213,7 @@ Treat as near-mandatory. Record while building Part 4 — that's where the agent
 
 ## Trace artifact — single source of truth
 
-All LLM call logs go to **`data/processed/observability.jsonl`**. This is the file cited in submission as the trace record. Do not create a separate `agent_traces.jsonl` — consolidate into observability.jsonl, filtered by part tag if needed.
+All LLM call logs go to **`data/processed/shared_observability.jsonl`**. This is the file cited in submission as the trace record. Do not create a separate `agent_traces.jsonl` — consolidate into shared_observability.jsonl, filtered by part tag if needed.
 
 ---
 
@@ -221,12 +221,12 @@ All LLM call logs go to **`data/processed/observability.jsonl`**. This is the fi
 
 - `README.md`: setup, run instructions, reproduction steps
 - Notion doc: Parts 1-6 in brief's order, tight
-- Loom (≤7 min): record during Phase 4, show the agentic loop live
+- Loom (≤7 min): record during Part 4, show the agentic loop live
 
 ---
 
 ## Cut list if behind schedule (in order matching brief's priority)
 1. Part 5 (Reusable Skill) — can be a stub if truly out of time
 2. Part 3 (Commercial Framing) — compress to 1-2 sentences per gap
-3. Phase 2 (Agentic Audit) — reduce to top 3 gaps instead of 5
+3. Part 2 (Agentic Audit) — reduce to top 3 gaps instead of 5
 4. **Never cut Part 4 or Part 6**

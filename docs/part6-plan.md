@@ -1,12 +1,12 @@
 # Part 6 — 90-Day Pod Plan
-_To be written after Phase 4 — must use real numbers from Phases 1–4._  
+_To be written after Part 4 — must use real numbers from Parts 1–4._  
 _Format: 1–2 pages maximum. Linear-ticket work items, agent-augmented._
 
 ---
 
 ## Thesis
 
-_One paragraph. The bet, why now, what success looks like. Fill in with Phase 4 precision/recall numbers and actual Phase 2 gap coverage percentages._
+_One paragraph. The bet, why now, what success looks like. Fill in with Part 4 precision/recall numbers and actual Part 2 gap coverage percentages._
 
 The US dataset has adequate geographic breadth (all 51 states at ADEQUATE vs. SUSB) but structural sourcing gaps in the physical economy — Construction at 5.9% and Transportation at 2.0% combined coverage vs. SUSB+NES. These are the exact sectors where Sales Intelligence buyers (freight-tech, construction-tech, equipment-finance) concentrate their outbound spend. State contractor licensing boards and the FMCSA Motor Carrier database are public, structured, and have not been systematically ingested. A 3-engineer pod running a registry-ingestion sprint over 90 days can materially close Construction coverage in the top 10 states (representing ~60% of construction employer firms) and Transportation coverage nationwide via FMCSA — moving both sectors from HIGH_GAP to ADEQUATE, unlocking list-purchase renewals and reducing churn from construction and logistics customers within the first quarter.
 
@@ -26,11 +26,11 @@ The US dataset has adequate geographic breadth (all 51 states at ADEQUATE vs. SU
 
 | # | Title | Effort | Dependencies | Agent augmentation |
 |---|-------|--------|--------------|-------------------|
-| W1 | Ingest FMCSA Motor Carrier database (national) | M | None | data-engineer runs dedup against `us_companies_clean.parquet` |
+| W1 | Ingest FMCSA Motor Carrier database (national) | M | None | data-engineer runs dedup against `part0_companies_clean.parquet` |
 | W2 | Ingest state contractor licensing — top 10 construction states | L | None | data-engineer maps license records to NAICS 23, flags employer-level firms |
 | W3 | Entity match + dedup new records against existing dataset | M | W1, W2 | data-engineer runs fuzzy match; Haiku resolves clear matches; Sonnet for ambiguous |
 | W4 | Enrichment cascade on new + existing gap-sector records | M | W3 | `src/part4_pipeline.py` cascade (rules → search → Haiku → Sonnet) |
-| W5 | Eval: re-run `evals/eval_runner.py` on post-ingestion batch | S | W4 | verifier subagent runs eval, compares to Phase 4 baseline |
+| W5 | Eval: re-run `evals/eval_runner.py` on post-ingestion batch | S | W4 | verifier subagent runs eval, compares to Part 4 baseline |
 | W6 | Update coverage-audit skill for new market runs | S | W1–W5 | — (manual update to SKILL.md) |
 | W7 | Commercial review: refresh gap_findings.md with new coverage ratios | S | W5 | data-engineer subagent re-runs gap_detection.py |
 | W8 | Stakeholder output: state-by-state coverage delta report | S | W7 | — (SQL query + markdown table) |

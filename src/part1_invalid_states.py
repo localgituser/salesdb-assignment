@@ -14,7 +14,7 @@ from pathlib import Path
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 log = logging.getLogger(__name__)
 
-PARQUET = "data/processed/us_companies.parquet"
+PARQUET = "data/processed/part0_companies.parquet"
 
 VALID_STATES = [
     "Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado",

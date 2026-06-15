@@ -1,7 +1,7 @@
 """
 Part 1 — PoC enrichment sample builder.
 
-Builds data/processed/sample_audit.parquet — a 300-record stratified sample
+Builds data/processed/part1_sample_audit.parquet — a 300-record stratified sample
 across enterprise / mid-market / SMB / micro size bands, with each band
 split across the three enrichment-target conditions:
   - missing website
@@ -24,8 +24,8 @@ import duckdb
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
-INPUT_PARQUET = "data/processed/us_companies.parquet"
-OUTPUT_PARQUET = "data/processed/sample_audit.parquet"
+INPUT_PARQUET = "data/processed/part0_companies.parquet"
+OUTPUT_PARQUET = "data/processed/part1_sample_audit.parquet"
 SEED = 42
 
 SEGMENT_QUOTAS = {

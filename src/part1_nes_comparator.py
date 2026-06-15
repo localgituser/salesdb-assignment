@@ -25,9 +25,9 @@ log = logging.getLogger(__name__)
 
 SUSB_CSV = "data/raw/us_state_6digitnaics_2022.csv"
 NES_TXT = "data/raw/nonemp23st.txt"
-PARQUET = "data/processed/us_companies.parquet"
+PARQUET = "data/processed/part0_companies.parquet"
 AUDIT_MD = "docs/part0-discovery.md"
-MAPPING_CACHE = "data/processed/industry_naics_mapping.json"
+MAPPING_CACHE = "data/processed/part1_industry_naics_mapping.json"
 
 # All NAICS sector codes (must match part1_industry_mapper.py)
 NAICS_SECTORS = {
@@ -226,7 +226,7 @@ def append_to_audit(df: pd.DataFrame, audit_path: str) -> None:
 
 ## SUSB + NES Combined Industry Coverage Gap Analysis
 
-_Generated: {ts} | Sources: SUSB 2022 + NES 2023 national totals vs `us_companies.parquet`_
+_Generated: {ts} | Sources: SUSB 2022 + NES 2023 national totals vs `part0_companies.parquet`_
 
 {build_summary(df)}
 

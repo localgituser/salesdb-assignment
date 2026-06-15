@@ -1,12 +1,12 @@
 # Part 4 — PoC Enrichment Pipeline Walkthrough
 _Target gap: Construction (Gap 2) — state contractor licensing + website enrichment_  
-_Output: `data/enriched/poc_enriched_sample.parquet` (288 records, 4 size segments)_
+_Output: `data/enriched/part4_enriched_sample.parquet` (288 records, 4 size segments)_
 
 ---
 
 ## Pipeline Design
 
-The cascade runs in `src/part4_pipeline.py` against `data/processed/sample_audit.parquet` (288 records after handle-dedup from 300 target).
+The cascade runs in `src/part4_pipeline.py` against `data/processed/part1_sample_audit.parquet` (288 records after handle-dedup from 300 target).
 
 | Stage | What | Model | Why |
 |-------|------|-------|-----|
@@ -29,7 +29,7 @@ Stage 4 → uncertain: mark status=unresolved, move on (no retry)
 Any stage → cost ceiling hit mid-batch: stop cleanly, write status=budget_exhausted for remaining records
 ```
 
-Every transition is logged to `data/processed/observability.jsonl` with `phase`, `model`, `stage_resolved`, `cost`, `latency`, `outcome`.
+Every transition is logged to `data/processed/shared_observability.jsonl` with `phase`, `model`, `stage_resolved`, `cost`, `latency`, `outcome`.
 
 ---
 
@@ -68,7 +68,7 @@ Each enriched record adds the following columns to the base schema:
 _Hand-labelled: `evals/ground_truth.json` (20–25 records, static)_  
 _Runner: `evals/eval_runner.py` (no LLM calls)_
 
-Results to be filled in after Phase 4 run:
+Results to be filled in after Part 4 run:
 
 | Segment | Precision | Recall | Notes |
 |---------|-----------|--------|-------|
@@ -84,8 +84,8 @@ Results to be filled in after Phase 4 run:
 
 ## Cost & Traces
 
-Phase 4 budget: $5.00 (from `config/project.yaml` → `budget.per_phase_usd.phase_4`)  
-Cost log: `data/processed/cost_tracking.json` → `phase_4` key  
-Trace log: `data/processed/observability.jsonl` filtered by `"phase": "phase_4"`
+Part 4 budget: $5.00 (from `config/project.yaml` → `budget.per_part_usd.part_4`)  
+Cost log: `data/processed/shared_cost_tracking.json` → `part_4` key  
+Trace log: `data/processed/shared_observability.jsonl` filtered by `"phase": "part_4"`
 
 Stage 4 (Sonnet) cost signal: if Stage 4 accounts for >40% of resolved records, the cascade is over-relying on the expensive model — flag for calibration review.

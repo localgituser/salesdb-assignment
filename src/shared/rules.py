@@ -1,8 +1,8 @@
 """
-Phase 1.5 — Deterministic cleanup gate.
+Part 1.5 — Deterministic cleanup gate.
 
-Reads:  data/processed/us_companies.parquet  (never modified)
-Writes: data/processed/us_companies_clean.parquet
+Reads:  data/processed/part0_companies.parquet  (never modified)
+Writes: data/processed/part0_companies_clean.parquet
 
 Rules applied (in order, first match wins per field):
   state:   trim → already-valid → case-fix → abbreviation-expand →
@@ -31,7 +31,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 log = logging.getLogger(__name__)
 
 INPUT = ROOT / CONFIG.market.dataset.parquet
-OUTPUT = ROOT / "data/processed/us_companies_clean.parquet"
+OUTPUT = ROOT / "data/processed/part0_companies_clean.parquet"
 
 # ── Valid state universe ───────────────────────────────────────────────────────
 

@@ -17,7 +17,7 @@ logging.basicConfig(level=logging.INFO, format="%(message)s")
 log = logging.getLogger(__name__)
 
 SUSB_CSV = "data/raw/us_state_6digitnaics_2022.csv"
-PARQUET = "data/processed/us_companies.parquet"
+PARQUET = "data/processed/part0_companies.parquet"
 AUDIT_MD = "docs/part0-discovery.md"
 
 # FIPS numeric code → full state name (50 states + DC)
@@ -143,7 +143,7 @@ def append_to_audit(coverage_df: pd.DataFrame, audit_path: str) -> None:
 
 ## SUSB State Coverage Gap Analysis
 
-_Generated: {ts} | Source: US Census SUSB 2022 (`us_state_6digitnaics_2022.csv`) vs `us_companies.parquet`_
+_Generated: {ts} | Source: US Census SUSB 2022 (`us_state_6digitnaics_2022.csv`) vs `part0_companies.parquet`_
 
 {build_summary(coverage_df)}
 

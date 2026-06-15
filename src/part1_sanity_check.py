@@ -3,7 +3,7 @@ import duckdb
 import pandas as pd
 
 conn = duckdb.connect()
-conn.execute("CREATE TABLE companies AS SELECT * FROM read_parquet('data/processed/us_companies.parquet')")
+conn.execute("CREATE TABLE companies AS SELECT * FROM read_parquet('data/processed/part0_companies.parquet')")
 
 # Check state distribution
 print("=" * 60)

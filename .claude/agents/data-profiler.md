@@ -85,6 +85,6 @@ Write a structured Markdown section suitable for appending to the baseline obser
 
 - Every field in the input scope has either findings or an explicit "no issues found" entry — no silent skips.
 - Summary table at the end of the Markdown section: `Field | Issue | Count | Fix` for every finding.
-- `data/processed/profiling_summary.json` written with one record per finding: `{field, issue, count, pct_of_records, fix_class, examples: [...up to 5], requires_llm_review: bool}`.
+- `data/processed/part1_profiling_summary.json` written with one record per finding: `{field, issue, count, pct_of_records, fix_class, examples: [...up to 5], requires_llm_review: bool}`.
 - Source Parquet unmodified.
 - No external comparator was consulted — that's the data-engineer's lane.

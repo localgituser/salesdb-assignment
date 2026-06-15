@@ -100,10 +100,10 @@ cascade:
 eval:
   ground_truth_size_min: 20
   ground_truth_size_max: 25
-  # Spot-check size per gap candidate (Phase 2 verifier). n=15 gives ~95% power
+  # Spot-check size per gap candidate (Part 2 verifier). n=15 gives ~95% power
   # to detect a gap at expected prevalence ≥20%.
   spot_check_n_per_gap: 15
-  # Record-level semantic audit sample per gap (Phase 2 data-engineer, Haiku).
+  # Record-level semantic audit sample per gap (Part 2 data-engineer, Haiku).
   # n=100 gives ~80% power to detect a 10% defect rate at 95% confidence.
   record_audit_n_per_gap: 100
 
@@ -135,8 +135,8 @@ markets:
     name: "United States"
     subregion_label: state   # "state" for US; "country" or "province" elsewhere
     dataset:
-      parquet: data/processed/us_companies.parquet
-      sample: data/processed/sample_audit.parquet
+      parquet: data/processed/part0_companies.parquet
+      sample: data/processed/part1_sample_audit.parquet
       primary_key: handle
     comparators:
       employer:
@@ -147,7 +147,7 @@ markets:
         source: NES
         vintage: 2023
         path: data/raw/nes_2023.csv
-    # Phase 4 enrichable size bands — all bands the cascade runs against.
+    # Part 4 enrichable size bands — all bands the cascade runs against.
     # Gate uses this to catch size=NULL / unexpected values in the batch.
     enrichable_size_bands:
       - "1-10"

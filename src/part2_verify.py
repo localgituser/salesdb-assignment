@@ -3,7 +3,7 @@ Part 2 — Verifier Spot-Check (verifier role)
 
 Reads part2_audit_raw.json (data-engineer output).
 For each of the top 5 gaps, independently re-derives gap evidence from
-us_companies_clean.parquet using DuckDB SQL — no LLM calls.
+part0_companies_clean.parquet using DuckDB SQL — no LLM calls.
 
 Spot-check protocol (n=15 per gap):
   - Draws 15 records from the gap's naics slice in our dataset
@@ -14,7 +14,7 @@ Spot-check protocol (n=15 per gap):
 Writes:
   docs/part2-audit.md   — final human-readable findings (agent + verifier sections)
 
-Does NOT modify part2_audit_raw.json or gap_candidates.json.
+Does NOT modify part2_audit_raw.json or part2_gap_candidates.json.
 """
 
 import json
@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 PROCESSED_DIR = Path(__file__).parent.parent / "data" / "processed"
 DOCS_DIR = Path(__file__).parent.parent / "docs"
 AUDIT_RAW_PATH = PROCESSED_DIR / "part2_audit_raw.json"
-CLEAN_PARQUET = PROCESSED_DIR / "us_companies_clean.parquet"
+CLEAN_PARQUET = PROCESSED_DIR / "part0_companies_clean.parquet"
 GAP_FINDINGS_PATH = DOCS_DIR / "part2-audit.md"
 
 SPOT_CHECK_N = CONFIG.eval.spot_check_n_per_gap
@@ -58,8 +58,8 @@ def load_audit_raw() -> dict:
 
 
 def get_naics_industry_labels(naics_code: str) -> list[str]:
-    """Load industry labels that map to this NAICS code from industry_naics_mapping.json."""
-    mapping_path = PROCESSED_DIR / "industry_naics_mapping.json"
+    """Load industry labels that map to this NAICS code from part1_industry_naics_mapping.json."""
+    mapping_path = PROCESSED_DIR / "part1_industry_naics_mapping.json"
     if not mapping_path.exists():
         return []
     with open(mapping_path) as f:
@@ -151,7 +151,7 @@ def spot_check_gap(
     }
 
 
-SUSB_ADEQUATE_THRESHOLD = 35.0  # mirrors NES_THRESHOLD / SUSB_ADEQUATE_THRESHOLD in phase2_audit
+SUSB_ADEQUATE_THRESHOLD = 35.0  # mirrors NES_THRESHOLD / SUSB_ADEQUATE_THRESHOLD in part2_audit
 
 
 def derive_trust_verdict(
@@ -171,7 +171,7 @@ def derive_trust_verdict(
     sector_total = spot_check["sector_total_in_dataset"]
 
     # ARTIFACT only when NES dominates AND employer-firm coverage is adequate.
-    # Mirrors the pre-filter in phase2_audit.py: sectors with NES > 70% but
+    # Mirrors the pre-filter in part2_audit.py: sectors with NES > 70% but
     # coverage_vs_susb < 35% were left actionable because a real employer gap exists.
     if nes_share_pct > 70 and coverage_vs_susb_pct >= SUSB_ADEQUATE_THRESHOLD:
         return (
@@ -227,13 +227,13 @@ def render_gap_findings_md(
     total_cost = audit_raw.get("total_part2_cost", 0.0)
 
     lines = [
-        "# Phase 2 — Agentic Coverage & Quality Audit Findings",
+        "# Part 2 — Agentic Coverage & Quality Audit Findings",
         f"_Generated: {now}_",
         f"_Models: {haiku.get('audit_model', 'haiku')} (sector ranking) + "
         f"{synthesis.get('synthesis_model', 'sonnet')} (synthesis)_",
         f"_Prompt versions: {haiku.get('prompt_version', 'audit_v1')} / "
         f"{synthesis.get('prompt_version', 'audit_synthesis_v1')}_",
-        f"_Phase 2 LLM cost: ${total_cost:.4f}_",
+        f"_Part 2 LLM cost: ${total_cost:.4f}_",
         f"_Spot-check: n={SPOT_CHECK_N} per gap, pure SQL, no LLM_",
         "",
         "---",
@@ -296,7 +296,7 @@ def render_gap_findings_md(
         "",
         "## Verifier Spot-Check Detail",
         "",
-        f"Each gap independently re-derived from `us_companies_clean.parquet` via SQL. "
+        f"Each gap independently re-derived from `part0_companies_clean.parquet` via SQL. "
         f"n={SPOT_CHECK_N} per gap. No LLM calls in this section.",
         "",
     ]
@@ -364,14 +364,14 @@ def render_gap_findings_md(
         "## Trust Calibration Note",
         "",
         "The data-engineer (Haiku + Sonnet) produced sector rankings and gap narratives from "
-        "pre-aggregated statistics in `gap_candidates.json`. The verifier independently "
-        f"re-derived each top-5 finding from raw `us_companies_clean.parquet` via SQL (n={SPOT_CHECK_N} "
+        "pre-aggregated statistics in `part2_gap_candidates.json`. The verifier independently "
+        f"re-derived each top-5 finding from raw `part0_companies_clean.parquet` via SQL (n={SPOT_CHECK_N} "
         "per gap). Verdicts above reflect the verifier's independent assessment.",
         "",
         "Known methodological limits:",
         "- NES non-employer comparator inflates gaps in sole-proprietor-heavy sectors "
         "(Transportation, Other Services, Admin & Support).",
-        "- Industry labels in our dataset map to NAICS via `industry_naics_mapping.json` "
+        "- Industry labels in our dataset map to NAICS via `part1_industry_naics_mapping.json` "
         "(244 labels mapped); unmapped labels are excluded from sector counts.",
         "- Confidence scores are agent-estimated, not statistically derived.",
         "- **Record-level quality pass is plausibility-only, not ground-truth verification.** "
@@ -381,7 +381,7 @@ def render_gap_findings_md(
         "Issue counts are directional signals, not measured error rates.",
         "- **Dataset is approximately 3 years old** (sourced circa 2022–2023 based on SUSB 2022 / "
         "NES 2023 comparators). Websites change, companies close, and industry classifications shift. "
-        "A significant share of 'clean' records may now be stale. A Google Places API run in Phase 4 "
+        "A significant share of 'clean' records may now be stale. A Google Places API run in Part 4 "
         "serves dual purpose — enriching missing website/category fields for gap sectors *and* "
         "validating existing records against current business state. "
         "Partial, verified data is preferable to high-volume data of unknown freshness.",
@@ -391,7 +391,7 @@ def render_gap_findings_md(
 
 
 def main():
-    logger.info("Phase 2 verifier starting")
+    logger.info("Part 2 verifier starting")
     audit_raw = load_audit_raw()
     synthesis = audit_raw.get("sonnet_synthesis", {})
     top5 = synthesis.get("top_5_gaps", [])
@@ -404,7 +404,7 @@ def main():
 
     con = duckdb.connect()
 
-    # Build sector-level lookups from actionable_sectors (written by phase2_audit.py)
+    # Build sector-level lookups from actionable_sectors (written by part2_audit.py)
     nes_share_by_naics = {
         s["naics_code"]: s.get("nes_share_of_comparator_pct", 0.0)
         for s in actionable_sectors
@@ -442,7 +442,7 @@ def main():
             spot_checks.append(sc)
             verdicts.append((
                 "PLAUSIBLE",
-                "Size-dimension gap — no NAICS code; verified via Phase 1 size quality summary "
+                "Size-dimension gap — no NAICS code; verified via Part 1 size quality summary "
                 f"(enterprise 1.65% of records, website fill 80.9%). SQL spot-check not applicable.",
             ))
             continue
@@ -464,7 +464,7 @@ def main():
     md = render_gap_findings_md(audit_raw, spot_checks, verdicts)
     GAP_FINDINGS_PATH.write_text(md)
     logger.info(f"Wrote {GAP_FINDINGS_PATH}")
-    logger.info("Phase 2 verification complete.")
+    logger.info("Part 2 verification complete.")
 
 
 if __name__ == "__main__":

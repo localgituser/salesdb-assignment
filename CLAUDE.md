@@ -31,8 +31,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This project uses three subagents defined in `.claude/agents/`:
 
-- **data-profiler** — Part 1 extended data quality auditing: field-type-aware distribution checks, cross-field consistency, null pattern analysis. Deterministic only (no LLM calls). Produces a Markdown section for `docs/part1-baseline.md` and `data/processed/profiling_summary.json`.
-- **data-engineer** — produces work: Part 2 gap candidates (`gap_candidates.json`), Part 4 enrichment cascade output (`poc_enriched_sample.parquet`). Never marks its own output as verified.
+- **data-profiler** — Part 1 extended data quality auditing: field-type-aware distribution checks, cross-field consistency, null pattern analysis. Deterministic only (no LLM calls). Produces a Markdown section for `docs/part1-baseline.md` and `data/processed/part1_profiling_summary.json`.
+- **data-engineer** — produces work: Part 2 gap candidates (`part2_gap_candidates.json`), Part 4 enrichment cascade output (`part4_enriched_sample.parquet`). Never marks its own output as verified.
 - **verifier** — checks work: Part 2 spot-checks (15 records per gap candidate, independent re-derivation from raw data → `docs/part2-audit.md`), Part 4 eval (`eval_runner.py`, precision/recall). Never produces new gaps or enrichments, never edits the data-engineer's output files.
 
 **Invoke explicitly** — auto-delegation is unreliable. E.g.:
@@ -52,12 +52,12 @@ Verifier calls (spot-checks, eval_runner) do not count against the part's LLM bu
 ## Context Hygiene (avoid burning tokens)
 
 - **Never read the raw CSV or full Parquet files into context.** Use DuckDB SQL queries that return aggregates, `.head()`, or `LIMIT`-bounded samples only.
-- When inspecting `data/processed/observability.jsonl` or other large JSONL/JSON outputs, grep/filter for the relevant part or gap_id — never cat the whole file.
+- When inspecting `data/processed/shared_observability.jsonl` or other large JSONL/JSON outputs, grep/filter for the relevant part or gap_id — never cat the whole file.
 - When checking dataset schema or distributions, query DuckDB directly (`SELECT state, COUNT(*) FROM ... GROUP BY state`) rather than loading into pandas and printing.
 
 ## Before re-running any LLM part
 
-Check `data/processed/observability.jsonl` for existing entries tagged with that part. If entries exist, **ask the user before re-running** — re-running an LLM part consumes budget again from the fixed $10 total, and there's no automatic carryover or refund.
+Check `data/processed/shared_observability.jsonl` for existing entries tagged with that part. If entries exist, **ask the user before re-running** — re-running an LLM part consumes budget again from the fixed $10 total, and there's no automatic carryover or refund.
 
 
 
@@ -91,7 +91,7 @@ logger.log_call(
 )
 ```
 
-Cost is tracked in `data/processed/cost_tracking.json` (running total + per-part breakdown) and `data/processed/observability.jsonl` (per-call details). **Before running any LLM part, check the budget**:
+Cost is tracked in `data/processed/shared_cost_tracking.json` (running total + per-part breakdown) and `data/processed/shared_observability.jsonl` (per-call details). **Before running any LLM part, check the budget**:
 
 ```python
 logger = ObservabilityLogger()
@@ -124,7 +124,7 @@ Observed US dataset distribution (descriptive, not a threshold):
 
 ### Sampling & Ground Truth
 
-- `data/processed/sample_audit.parquet` — stratified sample used for audit
+- `data/processed/part1_sample_audit.parquet` — stratified sample used for audit
 - `evals/ground_truth.json` — hand-labelled records for Part 4 eval (size range in `config/project.yaml` → `eval.{ground_truth_size_min, ground_truth_size_max}`)
 
 **Important**: Ground truth is **static and hand-curated**. Never regenerate or modify it programmatically.
@@ -139,13 +139,13 @@ source venv/bin/activate  # Use venv/ (not .venv/)
 ### Part 0: Ingestion
 ```bash
 python src/part0_ingestion.py
-# Output: data/processed/us_companies.parquet
+# Output: data/processed/part0_companies.parquet
 ```
 
 ### Part 1: Baseline & Stratification
 ```bash
 python src/part1_sampling.py
-# Output: docs/part1-baseline.md, data/processed/sample_audit.parquet
+# Output: docs/part1-baseline.md, data/processed/part1_sample_audit.parquet
 ```
 
 ### Data Sanity Check (ad-hoc)
@@ -157,18 +157,18 @@ python src/part1_sanity_check.py  # Quick state/industry/size distribution
 ```bash
 python src/part4_pipeline.py   # Cascade enrichment
 python evals/eval_runner.py  # Precision/recall against ground_truth.json
-# Output: data/enriched/poc_enriched_sample.parquet, eval results
+# Output: data/enriched/part4_enriched_sample.parquet, eval results
 ```
 
 ## Key Files & Output Artifacts
 
 ### Data Files
 - `data/raw/` — Source datasets (not in repo, loaded from Kaggle)
-- `data/processed/us_companies.parquet` — Main dataset (Parquet format)
-- `data/processed/sample_audit.parquet` — Stratified sample for audit
-- `data/processed/observability.jsonl` — Line-delimited LLM call logs
-- `data/processed/cost_tracking.json` — Running total + per-part cost breakdown (single JSON object)
-- `data/enriched/poc_enriched_sample.parquet` — Enriched records post-Part 4
+- `data/processed/part0_companies.parquet` — Main dataset (Parquet format)
+- `data/processed/part1_sample_audit.parquet` — Stratified sample for audit
+- `data/processed/shared_observability.jsonl` — Line-delimited LLM call logs
+- `data/processed/shared_cost_tracking.json` — Running total + per-part cost breakdown (single JSON object)
+- `data/enriched/part4_enriched_sample.parquet` — Enriched records post-Part 4
 
 ### Documentation
 - `docs/` — Assessor-facing deliverables, one file per Part (part1-baseline.md through part6-plan.md)
@@ -209,7 +209,7 @@ Comparator source data: `src/part1_comparator.py` (SUSB), `src/part1_nes_compara
 
 ### Part 4 PoC Scope — Context for data-engineer
 
-Single-pass PoC against a size-stratified sample spanning all four enrichable segments. Source: `markets.us.dataset.sample` (currently `data/processed/sample_audit.parquet`, 288 records after handle dedup from 300 quota). Sample builder: `src/part1_sampling.py`.
+Single-pass PoC against a size-stratified sample spanning all four enrichable segments. Source: `markets.us.dataset.sample` (currently `data/processed/part1_sample_audit.parquet`, 288 records after handle dedup from 300 quota). Sample builder: `src/part1_sampling.py`.
 
 Segment quotas (300 target → 288 unique): enterprise 60, mid-market 80, SMB 80, micro 80. Enterprise (500+) is oversampled relative to population share (1.65%) to give the eval statistical power on the primary ICP. Within each segment, records are split across three enrichment-target conditions: 50% missing website, 30% missing industry, 20% website set to a platform/social/builder URL.
 
@@ -229,7 +229,7 @@ Thresholds live in `config/project.yaml` → `cascade.{stage4_cost_signal, confi
 
 ### Trace Artifact — Single Source of Truth
 
-All LLM call logs go to **`data/processed/observability.jsonl`**. This is the submission's trace record. Do not create a separate `agent_traces.jsonl` — consolidate everything into `observability.jsonl`, filtered by `part` tag when inspecting. The data-engineer agent definition of done references this file.
+All LLM call logs go to **`data/processed/shared_observability.jsonl`**. This is the submission's trace record. Do not create a separate `agent_traces.jsonl` — consolidate everything into `shared_observability.jsonl`, filtered by `part` tag when inspecting. The data-engineer agent definition of done references this file.
 
 ### Budget Enforcement
 
@@ -287,11 +287,11 @@ print(f"Total cost: ${logger.total_cost:.4f}")
 
 ### Inspect a Parquet file
 ```bash
-python -c "import pandas as pd; print(pd.read_parquet('data/processed/us_companies.parquet').head())"
+python -c "import pandas as pd; print(pd.read_parquet('data/processed/part0_companies.parquet').head())"
 ```
 
 ### Add a new rule
-Edit `src/shared/rules.py` and test on a small slice of `sample_audit.parquet` before running Part 4 end-to-end.
+Edit `src/shared/rules.py` and test on a small slice of `part1_sample_audit.parquet` before running Part 4 end-to-end.
 
 ### Modify prompts
 Update `prompts/part2_audit_v1.txt` or `prompts/part4_enrichment_v1.txt`, increment version, and update the `prompt_version` parameter in the corresponding part script and observability logger.

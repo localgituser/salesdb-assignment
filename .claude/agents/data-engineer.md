@@ -25,10 +25,10 @@ Read CLAUDE.md for dataset-specific facts: primary key field, batch composition,
 5. **Escalate, don't loop.** If Stage 3 (Haiku) returns low confidence or a mismatch, escalate to Stage 4 (Sonnet) exactly once. If Stage 4 is also uncertain, mark the record `status: unresolved` and move on — do not retry indefinitely.
 6. **Stay in your lane.** Do not write to the evals directory, do not write final gap rankings to gap_findings.md (that's the verifier's output), do not edit baseline audit files.
 7. **Surface your uncertainty.** Trust calibration is the Part 2 grading dimension — over-claiming confidence is a fail. For each candidate gap, name the dimensions you could NOT validate (e.g., "comparator vintage mismatch", "NAICS mapping is LLM-approximated") in the `caveats` field. A low-confidence candidate with honest caveats beats a high-confidence one without.
-8. **Re-run guard.** Before any LLM call, read `data/processed/observability.jsonl` and count entries tagged with the target phase. If any exist, abort with a message — do not silently re-spend budget. The user must explicitly approve a re-run.
+8. **Re-run guard.** Before any LLM call, read `data/processed/shared_observability.jsonl` and count entries tagged with the target phase. If any exist, abort with a message — do not silently re-spend budget. The user must explicitly approve a re-run.
 
 ## Output format
-- Phase 2: `data/processed/gap_candidates.json` — array of:
+- Phase 2: `data/processed/part2_gap_candidates.json` — array of:
   ```
   {
     gap_id: "<dimension>_<slice>",       // e.g., "industry_naics_23"
@@ -45,7 +45,7 @@ Read CLAUDE.md for dataset-specific facts: primary key field, batch composition,
   }
   ```
   Schema mirrors `notes/part1_baseline_observations.md` Section 10 — reuse, do not re-invent.
-- Phase 4: `data/enriched/poc_enriched_sample.parquet` — original columns + enriched fields + `confidence` (0.0–1.0) + `stage_resolved` (1|2|3|4) + `status` (resolved|unresolved|budget_exhausted)
+- Phase 4: `data/enriched/part4_enriched_sample.parquet` — original columns + enriched fields + `confidence` (0.0–1.0) + `stage_resolved` (1|2|3|4) + `status` (resolved|unresolved|budget_exhausted)
 
 ## Definition of done
 - All records in the batch have a status (resolved/unresolved), no silent drops.

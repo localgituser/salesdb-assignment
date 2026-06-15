@@ -11,7 +11,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 DATASET_PATH = "data/raw/companies-2023-q4-sm.csv"
-OUTPUT_PARQUET = "data/processed/us_companies.parquet"
+OUTPUT_PARQUET = "data/processed/part0_companies.parquet"
 
 
 def ingest_and_convert():

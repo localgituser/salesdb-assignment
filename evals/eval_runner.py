@@ -1,5 +1,5 @@
 """
-Evaluation runner for Phase 4.
+Evaluation runner for Part 4.
 Computes precision/recall against hand-labeled ground truth.
 No LLM calls.
 """

@@ -5,7 +5,7 @@ Maps our free-text industry labels to 2-digit NAICS sectors using Claude Haiku,
 then computes industry-level coverage ratios against SUSB national firm counts.
 
 Output: appends industry coverage section to docs/part0-discovery.md
-        saves mapping cache to data/processed/industry_naics_mapping.json
+        saves mapping cache to data/processed/part1_industry_naics_mapping.json
 """
 
 import json
@@ -26,9 +26,9 @@ logging.basicConfig(level=logging.INFO, format="%(message)s")
 log = logging.getLogger(__name__)
 
 SUSB_CSV = "data/raw/us_state_6digitnaics_2022.csv"
-PARQUET = "data/processed/us_companies.parquet"
+PARQUET = "data/processed/part0_companies.parquet"
 AUDIT_MD = "docs/part0-discovery.md"
-MAPPING_CACHE = "data/processed/industry_naics_mapping.json"
+MAPPING_CACHE = "data/processed/part1_industry_naics_mapping.json"
 
 PART = "part_1_industry_map"
 PART_BUDGET = 1.00  # $1 hard ceiling for this mapping step
@@ -119,7 +119,7 @@ def map_industries_with_llm(
     if phase_cost >= PART_BUDGET:
         raise RuntimeError(
             f"Part budget exhausted (${phase_cost:.4f} >= ${PART_BUDGET:.2f}). "
-            "Delete data/processed/industry_naics_mapping.json to remap."
+            "Delete data/processed/part1_industry_naics_mapping.json to remap."
         )
 
     api_key = os.environ.get("ANTHROPIC_API_KEY")
@@ -310,7 +310,7 @@ def append_to_audit(
 
 ## SUSB Industry Coverage Gap Analysis
 
-_Generated: {ts} | Source: SUSB 2022 national totals vs `us_companies.parquet` | Model: claude-haiku-4-5-20251001_
+_Generated: {ts} | Source: SUSB 2022 national totals vs `part0_companies.parquet` | Model: claude-haiku-4-5-20251001_
 
 {build_summary(coverage_df, label_count, obs)}
 
