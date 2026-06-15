@@ -18,6 +18,7 @@ Does NOT modify phase2_audit_raw.json or gap_candidates.json.
 """
 
 import json
+import re
 import sys
 import logging
 from pathlib import Path
@@ -39,8 +40,14 @@ AUDIT_RAW_PATH = PROCESSED_DIR / "phase2_audit_raw.json"
 CLEAN_PARQUET = PROCESSED_DIR / "us_companies_clean.parquet"
 GAP_FINDINGS_PATH = NOTES_DIR / "gap_findings.md"
 
-SPOT_CHECK_N = 15
+SPOT_CHECK_N = CONFIG.eval.spot_check_n_per_gap
 OVERSTATED_THRESHOLD = 0.30  # if our observed rate is >30% higher than claimed, flag
+
+
+def _parse_prevalence_pct(prevalence: str) -> float:
+    """Extract first numeric percentage from a free-text prevalence string."""
+    m = re.search(r"(\d+(?:\.\d+)?)\s*%", str(prevalence))
+    return float(m.group(1)) if m else 0.0
 
 
 def load_audit_raw() -> dict:
@@ -95,6 +102,7 @@ def spot_check_gap(
         WHERE state IS NOT NULL
           AND {industry_filter}
     """
+    logger.info(f"[SQL:count] NAICS {naics_code}\n{sector_count_sql.strip()}")
     sector_total = con.execute(sector_count_sql).fetchone()[0]
 
     # Sample n=15 deterministically
@@ -106,6 +114,7 @@ def spot_check_gap(
         ORDER BY hash(handle || 'phase2_verify_seed')
         LIMIT {SPOT_CHECK_N}
     """
+    logger.info(f"[SQL:sample] NAICS {naics_code}\n{sample_sql.strip()}")
     sample_df = con.execute(sample_sql).df()
 
     # Field fill rates on the sample
@@ -131,6 +140,8 @@ def spot_check_gap(
         "industry_labels_matched": industry_labels[:10],
         "sector_total_in_dataset": sector_total,
         "spot_check_n": len(records),
+        "sql_count": sector_count_sql.strip(),
+        "sql_sample": sample_sql.strip(),
         "sample_fill_rates": fill_rates,
         "sample_state_distribution": state_dist,
         "sample_size_distribution": size_dist,
@@ -218,15 +229,15 @@ def render_gap_findings_md(
         "",
         "### Sector Ranking Summary (Haiku)",
         "",
-        "| Rank | Sector | Coverage% | Gap Type | Commercial Relevance | Priority | Confidence |",
-        "|---|---|---|---|---|---|---|",
+        "| Rank | Sector | Coverage% | Priority | Commercial Relevance | Confidence |",
+        "|---|---|---|---|---|---|",
     ]
 
     for s in haiku.get("ranked_sectors", []):
         lines.append(
             f"| {s['rank']} | {s['naics_desc']} | {s['overall_coverage_pct']}% "
-            f"| {s['gap_type']} | {s['commercial_relevance']}/5 "
-            f"| {s['enrichment_priority']} | {s['confidence']:.2f} |"
+            f"| {s['enrichment_priority']} | {s['commercial_relevance']}/5 "
+            f"| {s['confidence']:.2f} |"
         )
 
     if haiku.get("audit_notes"):
@@ -254,8 +265,6 @@ def render_gap_findings_md(
             f"**Enrichment approach**: {gap.get('enrichment_approach', '')}",
             f"**Agent confidence**: {gap.get('confidence', 0.0):.2f} — {gap.get('confidence_rationale', '')}",
         ]
-        if gap.get("nes_inflation_note"):
-            lines.append(f"**NES note**: {gap['nes_inflation_note']}")
         lines += [
             f"**Verifier verdict**: {verdict_emoji} {verdict} — {verdict_rationale}",
             "",
@@ -294,6 +303,18 @@ def render_gap_findings_md(
             f"- Size distribution: {sc['sample_size_distribution']}",
             f"- **Verdict**: {verdict} — {rationale}",
             "",
+            "<details><summary>Sampling methodology (SQL — reproducible with the dataset)</summary>",
+            "",
+            "```sql",
+            sc.get("sql_count", ""),
+            "```",
+            "",
+            "```sql",
+            sc.get("sql_sample", ""),
+            "```",
+            "",
+            "</details>",
+            "",
         ]
 
     lines += [
@@ -322,7 +343,8 @@ def main():
     audit_raw = load_audit_raw()
     synthesis = audit_raw.get("sonnet_synthesis", {})
     top5 = synthesis.get("top_5_gaps", [])
-    sector_summary = audit_raw.get("sector_summary", [])
+    # actionable_sectors is the key written by phase2_audit.py
+    actionable_sectors = audit_raw.get("actionable_sectors", [])
 
     if not top5:
         logger.error("No top_5_gaps in phase2_audit_raw.json — run phase2_audit.py first.")
@@ -330,10 +352,10 @@ def main():
 
     con = duckdb.connect()
 
-    # Build NES share lookup from sector_summary
+    # Build NES share lookup from actionable_sectors (written by phase2_audit.py)
     nes_share_by_naics = {
         s["naics_code"]: s.get("nes_share_of_comparator_pct", 0.0)
-        for s in sector_summary
+        for s in actionable_sectors
     }
 
     spot_checks = []
@@ -348,7 +370,7 @@ def main():
         spot_checks.append(sc)
 
         nes_share = nes_share_by_naics.get(naics_code, 0.0)
-        claimed_pct = float(str(gap.get("prevalence", "0")).split("%")[0].split()[-1])
+        claimed_pct = _parse_prevalence_pct(gap.get("prevalence", "0"))
         verdict, rationale = derive_trust_verdict(sc, claimed_pct, nes_share)
         verdicts.append((verdict, rationale))
 
