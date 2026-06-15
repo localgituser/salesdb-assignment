@@ -375,6 +375,17 @@ def render_gap_findings_md(
         "- Industry labels in our dataset map to NAICS via `industry_naics_mapping.json` "
         "(244 labels mapped); unmapped labels are excluded from sector counts.",
         "- Confidence scores are agent-estimated, not statistically derived.",
+        "- **Record-level quality pass is plausibility-only, not ground-truth verification.** "
+        "The Haiku audit flags issues based on name–website–industry coherence within the record. "
+        "It cannot confirm whether a website actually belongs to this specific entity, whether "
+        "the domain is live, or whether the industry label was applied correctly at ingestion. "
+        "Issue counts are directional signals, not measured error rates.",
+        "- **Dataset is approximately 3 years old** (sourced circa 2022–2023 based on SUSB 2022 / "
+        "NES 2023 comparators). Websites change, companies close, and industry classifications shift. "
+        "A significant share of 'clean' records may now be stale. A Google Places API run in Phase 4 "
+        "serves dual purpose — enriching missing website/category fields for gap sectors *and* "
+        "validating existing records against current business state. "
+        "Partial, verified data is preferable to high-volume data of unknown freshness.",
     ]
 
     return "\n".join(lines)
