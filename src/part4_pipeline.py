@@ -6,11 +6,11 @@ Cascade: rules → search → Haiku verify → Sonnet fallback.
 import logging
 import sys
 
-from src.gate import (
+from src.part4_gate import (
     GateFailure,
     check_batch_quality,
     check_cascade_health,
-    check_phase4_entry,
+    check_part4_entry,
     enforce,
 )
 
@@ -21,10 +21,10 @@ BATCH_PATH = "data/processed/sample_audit.parquet"
 ENRICHED_PATH = "data/enriched/poc_enriched_sample.parquet"
 
 
-def run_phase4() -> None:
-    print("=== Phase 4 entry gates ===")
+def run_part4() -> None:
+    print("=== Part 4 entry gates ===")
     try:
-        enforce(check_phase4_entry(), "phase4_entry")
+        enforce(check_part4_entry(), "part4_entry")
     except GateFailure as e:
         logger.error(str(e))
         sys.exit(1)
@@ -49,8 +49,8 @@ def run_phase4() -> None:
         logger.error(str(e))
         sys.exit(1)
 
-    logger.info("Phase 4 complete.")
+    logger.info("Part 4 complete.")
 
 
 if __name__ == "__main__":
-    run_phase4()
+    run_part4()

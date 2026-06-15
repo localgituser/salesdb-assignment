@@ -1,5 +1,5 @@
 # Part 1 — Baseline Observations
-_Generated: 2026-06-12 | Script: src/baseline_sql.py | Dataset: data/processed/us_companies.parquet_
+_Generated: 2026-06-12 | Script: src/phase1_baseline.py | Dataset: data/processed/us_companies.parquet_
 
 ---
 
@@ -19,7 +19,7 @@ _Generated: 2026-06-12 | Script: src/baseline_sql.py | Dataset: data/processed/u
 
 ## 1b. Invalid & Null State Analysis
 
-_Script: `src/invalid_state_analysis.py` | Comparator: full US state name list (50 states + DC + 5 territories)_
+_Script: `src/phase1_invalid_states.py` | Comparator: full US state name list (50 states + DC + 5 territories)_
 
 **Summary**
 
@@ -75,7 +75,7 @@ These are **rules-fixable** — normalisation (case folding, whitespace trim, ab
 
 **Foreign-record bound**: ≥1,879 confirmed foreign + an unknown sub-fraction of the 9,619 unclassified (estimated upper bound: ~3K–4K records total foreign). The non-recoverable residue after a full rules pass is therefore expected to be ~3K–4K records (~0.07%–0.10% of the US population) — small enough to drop without commercial impact.
 
-**Recommended fix** (add to `src/rules.py` before Phase 4):
+**Recommended fix** (add to `src/shared/rules.py` before Phase 4):
 1. Case-fold + trim: catches "District Of Columbia" → "District of Columbia"
 2. Abbreviation expansion map: "D.C." → "District of Columbia", "Tx Texas" → "Texas", "Fl Florida" → "Florida"
 3. City-in-state lookup: "Portland" → "Oregon" (or flag for manual review if ambiguous), "York" → flag
@@ -173,7 +173,7 @@ The `platform_url` condition forces the rules-stage blocklist to fire (yelp/face
 
 **Cost**: ~$0.50–1.50 at Haiku rates, fits the $5 Phase 4 budget.
 
-Script: `src/sampling.py` → `data/processed/sample_audit.parquet`. Each row is stamped with `poc_segment` and `poc_condition` so the eval can report per-cell.
+Script: `src/phase1_sampling.py` → `data/processed/sample_audit.parquet`. Each row is stamped with `poc_segment` and `poc_condition` so the eval can report per-cell.
 
 ---
 
@@ -489,7 +489,7 @@ These records are not missing (`website IS NOT NULL`) and would pass a simple fi
 | Institutional (.edu/.mil/.gov, already in blocklist) | 168 | 19,841 |
 | **True franchise / chain shared domain** | **192** | **21,978** |
 
-Top 10 true franchise/chain by record count: `thetopperson.com` (641), `marriott.com` (621), `expresspros.com` (499), `hilton.com` (495), `schoolloop.com` (328), `myshopify.com` (327), `meetup.com` (309), `hyatt.com` (306), `substack.com` (305), `vpweb.com` (281). Hotels, real estate brokerages (`kw.com` = Keller Williams), franchise services, and shared community platforms dominate. These are technically valid as proxy websites but misleading for unique company identification — flag with `has_shared_domain = true` in `src/rules.py`; do not null out.
+Top 10 true franchise/chain by record count: `thetopperson.com` (641), `marriott.com` (621), `expresspros.com` (499), `hilton.com` (495), `schoolloop.com` (328), `myshopify.com` (327), `meetup.com` (309), `hyatt.com` (306), `substack.com` (305), `vpweb.com` (281). Hotels, real estate brokerages (`kw.com` = Keller Williams), franchise services, and shared community platforms dominate. These are technically valid as proxy websites but misleading for unique company identification — flag with `has_shared_domain = true` in `src/shared/rules.py`; do not null out.
 
 **Placeholder strings**: ~90 records store partial URL strings (`www`, `com`, `http`, `https`) with no domain — rules-fixable via regex.
 
@@ -612,7 +612,7 @@ The future-year (`founded > 2026`) NaN result from Section 6 is resolved: there 
 
 ## 8. SUSB State Coverage Comparison
 
-_Source: US Census Statistics of U.S. Businesses (SUSB) 2022 (`us_state_6digitnaics_2022.csv`) vs `us_companies.parquet` | Script: `src/comparator.py`_
+_Source: US Census Statistics of U.S. Businesses (SUSB) 2022 (`us_state_6digitnaics_2022.csv`) vs `us_companies.parquet` | Script: `src/phase1_comparator.py`_
 
 **SUSB** (Statistics of U.S. Businesses) counts employer firms — businesses with at least one W-2 employee — by state and NAICS sector. It is the primary government benchmark for US business universe coverage.
 
@@ -642,7 +642,7 @@ Coverage ratio = our records / SUSB firm count per state. Gap tiers: HIGH_GAP <1
 
 ## 9. SUSB Industry Coverage Comparison
 
-_Source: Statistics of U.S. Businesses (SUSB) 2022 national totals (State='00') vs `us_companies.parquet` | Script: `src/industry_mapper.py` | LLM: claude-haiku-4-5-20251001 ($0.01208)_
+_Source: Statistics of U.S. Businesses (SUSB) 2022 national totals (State='00') vs `us_companies.parquet` | Script: `src/phase1_industry_mapper.py` | LLM: claude-haiku-4-5-20251001 ($0.01208)_
 
 244 free-text industry labels (≥500 records each) were mapped to 20 NAICS 2-digit sectors via a single Claude Haiku call. Coverage = our records in that NAICS sector / SUSB national firm count.
 
@@ -684,7 +684,7 @@ These five sectors collectively represent ~1.6M SUSB firms we have only partial 
 
 ## 10. SUSB + NES Combined Industry Coverage
 
-_Source: Statistics of U.S. Businesses (SUSB) 2022 (employer firms) + Nonemployer Statistics (NES) 2023 (non-employer establishments) vs `us_companies.parquet` | Script: `src/nes_comparator.py`_
+_Source: Statistics of U.S. Businesses (SUSB) 2022 (employer firms) + Nonemployer Statistics (NES) 2023 (non-employer establishments) vs `us_companies.parquet` | Script: `src/phase1_nes_comparator.py`_
 
 **NES** (Nonemployer Statistics) counts businesses with no paid employees — sole proprietors, self-employed individuals, and independent contractors. It captures ~30.4M entities that SUSB misses entirely. Adding NES to the SUSB denominator (~6.5M employer firms) produces a 36.9M total business universe. This changes the coverage picture significantly.
 
@@ -737,7 +737,7 @@ These sectors were ADEQUATE or MODERATE_GAP against SUSB alone, but are HIGH_GAP
 
 6. **The Information over-index is explained, not bias**: The 379.7% SUSB-only figure drops to 69.4% when NES non-employers are included. Our dataset captures the digital non-employer economy well; it does not over-represent tech firms, it just sees sole-proprietor tech workers that SUSB misses.
 
-7. **Rules cleanup first**: Short/garbage names, malformed URLs, suspicious founding years, and invalid state values — clear these with `src/rules.py` before running any LLM passes to avoid wasting tokens on non-entities. Invalid/null state records are 3.32% overall but reach 7.2% of large enterprises (10K+); most are recoverable via case normalisation and abbreviation expansion (see Section 1b).
+7. **Rules cleanup first**: Short/garbage names, malformed URLs, suspicious founding years, and invalid state values — clear these with `src/shared/rules.py` before running any LLM passes to avoid wasting tokens on non-entities. Invalid/null state records are 3.32% overall but reach 7.2% of large enterprises (10K+); most are recoverable via case normalisation and abbreviation expansion (see Section 1b).
 
 8. **Safe merge key established**: `handle` is the anchor for all enrichment writes.
 
@@ -807,7 +807,7 @@ Top 10 examples:
 
 **Interpretation**: The examples reveal two distinct root causes. "Acosta Group" is a legitimate large company that rebranded/reorganized in 2023 and may have updated its LinkedIn `founded` year to reflect the restructuring rather than the original entity's founding. "Salesforce QA Engineer" and "Generative AI CRM" are clearly not independent companies — they are likely job posting pages or LinkedIn profile artifacts that were ingested as company records. "Consciousness: Science, Spirituality & Social Impact" and "Fearless Founders AI" are likely community pages or micro-events misclassified as 10K+ organizations. The `size` field for these records is almost certainly scraped from follower counts or event attendance, not actual employee headcount.
 
-**Fix classification**: `flag_only` — these 231 records should be tagged `implausible_size_founded = true` in `src/rules.py`. Do not null out `size` or `founded` without manual verification; the root cause is ambiguous (rebranding vs. phantom record).
+**Fix classification**: `flag_only` — these 231 records should be tagged `implausible_size_founded = true` in `src/shared/rules.py`. Do not null out `size` or `founded` without manual verification; the root cause is ambiguous (rebranding vs. phantom record).
 
 ---
 
@@ -1019,7 +1019,7 @@ Top 5 Arabic examples:
 
 ### 11. Phase 1.5 — Deterministic Cleanup Gate Results
 
-**Executed**: 2026-06-13 | **Script**: `src/rules.py` | **Input**: `us_companies.parquet` (4,306,855 records) | **Output**: `us_companies_clean.parquet`
+**Executed**: 2026-06-13 | **Script**: `src/shared/rules.py` | **Input**: `us_companies.parquet` (4,306,855 records) | **Output**: `us_companies_clean.parquet`
 
 Rules are non-destructive: the original parquet is never modified. Each output record carries a `rules_flags` column listing which rules fired (empty = no change). Total records modified: **132,463 of 4,306,855 (3.1%)**.
 
@@ -1080,7 +1080,7 @@ Note: `state_case_fix` recoveries (title-case normalisation, ~10,495 records per
 
 ## 13. Phase 1.6 — Deterministic State×Industry Gap Detection
 
-_Generated: 2026-06-13 | Script: `src/gap_detection.py` | Source: `us_companies_clean.parquet` + SUSB 2022 | Output: `data/processed/gap_candidates.json`_
+_Generated: 2026-06-13 | Script: `src/phase1_gap_detection.py` | Source: `us_companies_clean.parquet` + SUSB 2022 | Output: `data/processed/gap_candidates.json`_
 
 Cross-tab: `our_count / SUSB_count` per state×industry cell. Tier C states excluded. Industry labels mapped to NAICS sectors via `data/processed/industry_naics_mapping.json`. Records with null state excluded from denominators; logged separately as `state_unknown_high_value`.
 

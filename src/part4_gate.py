@@ -1,5 +1,5 @@
 """
-Quality gates for phase boundary enforcement.
+Quality gates for part boundary enforcement.
 Raises GateFailure on hard stops; GateResult carries pass/fail detail per check.
 """
 
@@ -10,10 +10,10 @@ from typing import List
 
 import pandas as pd
 
-from src.config import CONFIG
-from src.observability import ObservabilityLogger
+from src.shared.config import CONFIG
+from src.shared.observability import ObservabilityLogger
 
-PHASE_BUDGETS = CONFIG.budget.per_phase_usd
+PART_BUDGETS = CONFIG.budget.per_part_usd
 TOTAL_BUDGET = CONFIG.budget.total_usd
 PLATFORM_BLOCKLIST = CONFIG.enrichment_rules.platform_blocklist_set
 ENRICHABLE_SIZE_BANDS = CONFIG.market.enrichable_size_bands_set
@@ -42,7 +42,7 @@ def _file_gate(path: str, label: str) -> GateResult:
 
 def _budget_gate(phase: str, logger: ObservabilityLogger) -> GateResult:
     spent = logger.get_phase_cost(phase)
-    cap = PHASE_BUDGETS.get(phase, 0.0)
+    cap = PART_BUDGETS.get(phase, 0.0)
     if spent >= cap:
         return GateResult(False, "budget_headroom", f"{phase} budget exhausted: ${spent:.4f} of ${cap:.2f} spent")
     return GateResult(True, "budget_headroom", f"{phase} budget OK: ${spent:.4f} spent, ${cap - spent:.4f} remaining")
@@ -55,21 +55,21 @@ def _total_budget_gate(logger: ObservabilityLogger) -> GateResult:
     return GateResult(True, "total_budget", f"Total budget OK: ${total:.4f} of ${TOTAL_BUDGET:.2f} spent")
 
 
-def check_phase2_entry() -> List[GateResult]:
-    """Pre-conditions before running Phase 2 gap detection."""
+def check_part2_entry() -> List[GateResult]:
+    """Pre-conditions before running Part 2 gap detection."""
     logger = ObservabilityLogger()
     return [
         _file_gate("data/processed/us_companies.parquet", "us_companies.parquet"),
         _file_gate("data/processed/sample_audit.parquet", "sample_audit.parquet"),
-        _budget_gate("phase_2", logger),
+        _budget_gate("part_2", logger),
         _total_budget_gate(logger),
     ]
 
 
-def check_phase4_entry(
+def check_part4_entry(
     gap_candidates_path: str = "data/processed/gap_candidates.json",
 ) -> List[GateResult]:
-    """Pre-conditions before running Phase 4 enrichment."""
+    """Pre-conditions before running Part 4 enrichment."""
     results: List[GateResult] = []
     logger = ObservabilityLogger()
 
@@ -83,21 +83,21 @@ def check_phase4_entry(
         if n < 3:
             results.append(GateResult(
                 False, "min_gap_candidates",
-                f"Only {n} gap candidate(s) — need ≥3 before Phase 4",
+                f"Only {n} gap candidate(s) — need ≥3 before Part 4",
             ))
         else:
             results.append(GateResult(True, "min_gap_candidates", f"{n} gap candidates present"))
 
-    # Verifier must have run before Phase 4 starts
-    findings_gate = _file_gate("notes/gap_findings.md", "gap_findings.md (verifier sign-off)")
+    # Verifier must have run before Part 4 starts
+    findings_gate = _file_gate("docs/part2-audit.md", "gap_findings.md (verifier sign-off)")
     if not findings_gate.passed:
         findings_gate = GateResult(
             False, "verifier_signoff",
-            "notes/gap_findings.md missing — run verifier on Phase 2 output before Phase 4",
+            "docs/part2-audit.md missing — run verifier on Part 2 output before Part 4",
         )
     results.append(findings_gate)
 
-    results.append(_budget_gate("phase_4", logger))
+    results.append(_budget_gate("part_4", logger))
     results.append(_total_budget_gate(logger))
     return results
 
@@ -142,7 +142,7 @@ def check_batch_quality(batch_path: str) -> List[GateResult]:
         if hits:
             results.append(GateResult(
                 False, "rules_applied",
-                f"{hits} records still carry platform URLs — apply rules.py before Phase 4",
+                f"{hits} records still carry platform URLs — apply rules.py before Part 4",
             ))
         else:
             results.append(GateResult(True, "rules_applied", "No platform URLs in batch"))
@@ -197,12 +197,12 @@ def check_cascade_health(enriched_path: str) -> List[GateResult]:
             results.append(GateResult(True, "no_silent_drops", "All records have a status"))
 
     logger = ObservabilityLogger()
-    spent = logger.get_phase_cost("phase_4")
-    cap = PHASE_BUDGETS.get("phase_4", 0.0)
+    spent = logger.get_phase_cost("part_4")
+    cap = PART_BUDGETS.get("part_4", 0.0)
     if spent > cap:
-        results.append(GateResult(False, "budget_compliance", f"Phase 4 over-budget: ${spent:.4f} vs ${cap:.2f} cap"))
+        results.append(GateResult(False, "budget_compliance", f"Part 4 over-budget: ${spent:.4f} vs ${cap:.2f} cap"))
     else:
-        results.append(GateResult(True, "budget_compliance", f"Phase 4 within budget: ${spent:.4f} of ${cap:.2f}"))
+        results.append(GateResult(True, "budget_compliance", f"Part 4 within budget: ${spent:.4f} of ${cap:.2f}"))
 
     return results
 

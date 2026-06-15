@@ -1,10 +1,10 @@
 """
-Phase 1 — SUSB Industry Coverage Mapper
+Part 1 — SUSB Industry Coverage Mapper
 
 Maps our free-text industry labels to 2-digit NAICS sectors using Claude Haiku,
 then computes industry-level coverage ratios against SUSB national firm counts.
 
-Output: appends industry coverage section to data/processed/baseline_audit.md
+Output: appends industry coverage section to docs/part0-discovery.md
         saves mapping cache to data/processed/industry_naics_mapping.json
 """
 
@@ -20,19 +20,18 @@ from pathlib import Path
 
 import anthropic
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
-from src.observability import ObservabilityLogger
+from src.shared.observability import ObservabilityLogger
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 log = logging.getLogger(__name__)
 
 SUSB_CSV = "data/raw/us_state_6digitnaics_2022.csv"
 PARQUET = "data/processed/us_companies.parquet"
-AUDIT_MD = "data/processed/baseline_audit.md"
+AUDIT_MD = "docs/part0-discovery.md"
 MAPPING_CACHE = "data/processed/industry_naics_mapping.json"
 
-PHASE = "phase_1_industry_map"
-PHASE_BUDGET = 1.00  # $1 hard ceiling for this mapping step
+PART = "part_1_industry_map"
+PART_BUDGET = 1.00  # $1 hard ceiling for this mapping step
 
 MIN_INDUSTRY_COUNT = 500  # exclude rare/noisy labels
 
@@ -116,10 +115,10 @@ def map_industries_with_llm(
     Call Claude Haiku once to map all labels → NAICS sector codes.
     Returns {label: naics_code}. Logs cost to observability.
     """
-    phase_cost = obs.get_phase_cost(PHASE)
-    if phase_cost >= PHASE_BUDGET:
+    phase_cost = obs.get_phase_cost(PART)
+    if phase_cost >= PART_BUDGET:
         raise RuntimeError(
-            f"Phase budget exhausted (${phase_cost:.4f} >= ${PHASE_BUDGET:.2f}). "
+            f"Part budget exhausted (${phase_cost:.4f} >= ${PART_BUDGET:.2f}). "
             "Delete data/processed/industry_naics_mapping.json to remap."
         )
 
@@ -146,12 +145,12 @@ def map_industries_with_llm(
 
     input_tokens = response.usage.input_tokens
     output_tokens = response.usage.output_tokens
-    from src.config import CONFIG
+    from src.shared.config import CONFIG
     haiku_pricing = CONFIG.models.pricing_per_mtok["claude-haiku-4-5-20251001"]
     cost = (input_tokens * haiku_pricing.input + output_tokens * haiku_pricing.output) / 1_000_000
 
     obs.log_call(
-        phase=PHASE,
+        phase=PART,
         model="claude-haiku-4-5-20251001",
         tokens=input_tokens + output_tokens,
         cost=cost,
@@ -255,7 +254,7 @@ def build_coverage_table(
 
 
 def _gap_tier(ratio: float) -> str:
-    from src.config import CONFIG
+    from src.shared.config import CONFIG
     return CONFIG.gap_tiers.classify(ratio)
 
 
@@ -277,7 +276,7 @@ def build_summary(df: pd.DataFrame, label_count: int, obs: ObservabilityLogger) 
     high = counts.get("HIGH_GAP", 0)
     moderate = counts.get("MODERATE_GAP", 0)
     adequate = counts.get("ADEQUATE", 0)
-    phase_cost = obs.get_phase_cost(PHASE)
+    phase_cost = obs.get_phase_cost(PART)
 
     high_gap_sectors = df[df["gap_tier"] == "HIGH_GAP"]["naics_desc"].tolist()
     gap_note = (
@@ -335,7 +334,7 @@ def run(
 
     obs = ObservabilityLogger()
 
-    log.info(f"Budget check: ${obs.get_phase_cost(PHASE):.5f} / ${PHASE_BUDGET:.2f} used for {PHASE}")
+    log.info(f"Budget check: ${obs.get_phase_cost(PART):.5f} / ${PART_BUDGET:.2f} used for {PART}")
 
     log.info(f"Loading industry labels (min_count={MIN_INDUSTRY_COUNT})...")
     label_pairs = get_industry_labels(parquet_path, MIN_INDUSTRY_COUNT)

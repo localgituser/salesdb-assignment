@@ -1,5 +1,5 @@
 """
-Phase 4 PoC enrichment sample builder.
+Part 1 — PoC enrichment sample builder.
 
 Builds data/processed/sample_audit.parquet — a 300-record stratified sample
 across enterprise / mid-market / SMB / micro size bands, with each band
@@ -13,7 +13,7 @@ Excludes (pre-filter, not deferral):
   - HIGH_CHURN_RISK strict flag (size=1-10 AND founded>=2015
     AND website IS NULL AND type IS NULL)
 
-Run: python src/sampling.py
+Run: python src/part1_sampling.py
 """
 
 import logging

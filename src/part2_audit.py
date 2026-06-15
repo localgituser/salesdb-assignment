@@ -1,5 +1,5 @@
 """
-Phase 2 — Agentic Coverage & Quality Audit (data-engineer role)
+Part 2 — Agentic Coverage & Quality Audit (data-engineer role)
 
 Reads gap_candidates.json + queries us_companies_clean.parquet, then calls:
   1. Haiku  — commercial relevance + enrichment approach for actionable sectors
@@ -9,11 +9,11 @@ Reads gap_candidates.json + queries us_companies_clean.parquet, then calls:
               state tier × size band; detects website mismatches, industry mislabels,
               platform URL misses, and data anomalies that rules can't catch)
 
-If phase2_audit_raw.json already exists with haiku_ranking + sonnet_synthesis,
+If part2_audit_raw.json already exists with haiku_ranking + sonnet_synthesis,
 steps 1 and 2 are skipped (idempotent) and only the record audit is re-run.
 
 Writes:
-  data/processed/phase2_audit_raw.json   — raw LLM outputs + all pre-computed summaries
+  data/processed/part2_audit_raw.json    — raw LLM outputs + all pre-computed summaries
   data/processed/observability.jsonl     — per-call trace entries
   data/processed/cost_tracking.json      — running total update
 
@@ -30,15 +30,14 @@ from pathlib import Path
 import duckdb
 import anthropic
 
-sys.path.insert(0, str(Path(__file__).parent))
-from config import CONFIG
-from observability import ObservabilityLogger
+from src.shared.config import CONFIG
+from src.shared.observability import ObservabilityLogger
 
 logging.basicConfig(level=logging.INFO, stream=sys.stderr,
                     format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
-PHASE = "phase_2"
+PART = "part_2"
 HAIKU_MODEL = "claude-haiku-4-5-20251001"
 SONNET_MODEL = "claude-sonnet-4-6"
 HAIKU_COST_PER_M_IN = 0.80
@@ -54,13 +53,13 @@ SONNET_COST_PER_M_OUT = 15.00
 NES_THRESHOLD = 0.70
 SUSB_ADEQUATE_THRESHOLD = 0.35
 
-PHASE2_BUDGET = CONFIG.budget.per_phase_usd.get("phase_2", 3.0)
+PART2_BUDGET = CONFIG.budget.per_part_usd.get("part_2", 3.0)
 
 PROMPTS_DIR = Path(__file__).parent.parent / "prompts"
 PROCESSED_DIR = Path(__file__).parent.parent / "data" / "processed"
 CLEAN_PARQUET = PROCESSED_DIR / "us_companies_clean.parquet"
 GAP_CANDIDATES_PATH = PROCESSED_DIR / "gap_candidates.json"
-AUDIT_RAW_PATH = PROCESSED_DIR / "phase2_audit_raw.json"
+AUDIT_RAW_PATH = PROCESSED_DIR / "part2_audit_raw.json"
 
 
 def load_gap_candidates() -> dict:
@@ -231,9 +230,9 @@ def call_llm(
     metadata: dict,
 ) -> tuple[str, dict]:
     """Call LLM, log to observability, return (text_response, usage_dict)."""
-    budget_used = obs.get_phase_cost(PHASE)
-    if budget_used >= PHASE2_BUDGET:
-        logger.error(f"Phase 2 budget exhausted (${budget_used:.4f} >= ${PHASE2_BUDGET}). Aborting.")
+    budget_used = obs.get_phase_cost(PART)
+    if budget_used >= PART2_BUDGET:
+        logger.error(f"Part 2 budget exhausted (${budget_used:.4f} >= ${PART2_BUDGET}). Aborting.")
         sys.exit(1)
 
     t0 = time.time()
@@ -265,7 +264,7 @@ def call_llm(
         logger.warning(f"LLM returned non-JSON for {prompt_version}")
 
     obs.log_call(
-        phase=PHASE,
+        phase=PART,
         model=model,
         tokens=usage["input_tokens"] + usage["output_tokens"],
         cost=cost,
@@ -462,7 +461,7 @@ def run_record_quality_audit(
     Run Haiku over each gap sample in batches of RECORD_AUDIT_BATCH records.
     Returns aggregated findings with per-gap issue counts.
     """
-    prompt_template = (PROMPTS_DIR / "record_audit_v1.txt").read_text()
+    prompt_template = (PROMPTS_DIR / "part2_record_audit_v1.txt").read_text()
     by_gap: dict = {}
     issue_counts_by_gap: dict = {}
     total_records = sum(len(v["records"]) for v in samples.values())
@@ -478,7 +477,7 @@ def run_record_quality_audit(
             prompt = prompt_template.replace("{{RECORDS_JSON}}", json.dumps(batch, indent=2))
             raw, _ = call_llm(
                 client, obs, HAIKU_MODEL, prompt,
-                prompt_version="record_audit_v1",
+                prompt_version="part2_record_audit_v1",
                 metadata={"gap_key": gap_key, "batch_start": i, "batch_n": len(batch)},
             )
             try:
@@ -563,7 +562,7 @@ def main():
 
         # --- Call 1: Haiku — commercial relevance + enrichment approach ---
         haiku_prompt = render_prompt(
-            PROMPTS_DIR / "audit_v1.txt",
+            PROMPTS_DIR / "part2_audit_v1.txt",
             actionable_sectors_json=json.dumps(actionable_sectors, indent=2),
             size_quality_json=json.dumps(size_quality, indent=2),
             sourcing_limit_sectors_json=json.dumps(
@@ -576,7 +575,7 @@ def main():
         )
         haiku_raw, _ = call_llm(
             client, obs, HAIKU_MODEL, haiku_prompt,
-            prompt_version="audit_v1",
+            prompt_version="part2_audit_v1",
             metadata={"actionable_sector_count": len(actionable_sectors),
                       "sourcing_limit_count": len(sourcing_limit_sectors)},
         )
@@ -592,14 +591,14 @@ def main():
         # --- Call 2: Sonnet — top-5 narrative synthesis ---
         top5_detail = build_top5_sector_detail(gap_candidates, top5_codes)
         sonnet_prompt = render_prompt(
-            PROMPTS_DIR / "audit_synthesis_v1.txt",
+            PROMPTS_DIR / "part2_audit_synthesis_v1.txt",
             haiku_rankings_json=json.dumps(haiku_output, indent=2),
             top5_sector_detail_json=json.dumps(top5_detail, indent=2),
             size_quality_json=json.dumps(size_quality, indent=2),
         )
         sonnet_raw, _ = call_llm(
             client, obs, SONNET_MODEL, sonnet_prompt,
-            prompt_version="audit_synthesis_v1",
+            prompt_version="part2_audit_synthesis_v1",
             metadata={"top5_codes": top5_codes},
         )
         try:
@@ -610,7 +609,7 @@ def main():
 
         top5 = sonnet_output.get("top_5_gaps", [])
         raw_output = {
-            "phase": PHASE,
+            "phase": PART,
             "actionable_sectors": actionable_sectors,
             "sourcing_limit_sectors": sourcing_limit_sectors,
             "size_quality_summary": size_quality,
@@ -624,12 +623,12 @@ def main():
     record_quality = run_record_quality_audit(client, obs, record_samples)
 
     raw_output["record_quality_findings"] = record_quality
-    raw_output["total_phase2_cost"] = obs.get_phase_cost(PHASE)
+    raw_output["total_part2_cost"] = obs.get_phase_cost(PART)
 
     AUDIT_RAW_PATH.write_text(json.dumps(raw_output, indent=2))
     logger.info(f"Wrote {AUDIT_RAW_PATH}")
-    logger.info(f"Phase 2 total cost: ${obs.get_phase_cost(PHASE):.4f}")
-    logger.info("Phase 2 audit complete. Run phase2_verify.py next (verifier role).")
+    logger.info(f"Part 2 total cost: ${obs.get_phase_cost(PART):.4f}")
+    logger.info("Part 2 audit complete. Run part2_verify.py next (verifier role).")
 
 
 if __name__ == "__main__":

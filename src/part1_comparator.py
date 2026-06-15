@@ -1,10 +1,10 @@
 """
-Phase 1 — SUSB State Coverage Comparator
+Part 1 — SUSB State Coverage Comparator
 
 Loads US Census SUSB 2022 firm counts by state and compares against our
 source dataset to identify under-represented states.
 
-Output: appends a coverage gap table to data/processed/baseline_audit.md
+Output: appends a coverage gap table to docs/part0-discovery.md
 """
 
 import duckdb
@@ -18,7 +18,7 @@ log = logging.getLogger(__name__)
 
 SUSB_CSV = "data/raw/us_state_6digitnaics_2022.csv"
 PARQUET = "data/processed/us_companies.parquet"
-AUDIT_MD = "data/processed/baseline_audit.md"
+AUDIT_MD = "docs/part0-discovery.md"
 
 # FIPS numeric code → full state name (50 states + DC)
 FIPS_TO_STATE = {
@@ -37,7 +37,7 @@ FIPS_TO_STATE = {
     "54": "West Virginia", "55": "Wisconsin", "56": "Wyoming",
 }
 
-from src.config import CONFIG
+from src.shared.config import CONFIG
 
 TIER_A = CONFIG.geography_tiering.tier_a_min
 TIER_B = CONFIG.geography_tiering.tier_b_min

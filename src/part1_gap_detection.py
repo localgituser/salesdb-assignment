@@ -30,7 +30,7 @@ from pathlib import Path
 import duckdb
 import pandas as pd
 
-from src.config import CONFIG
+from src.shared.config import CONFIG
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 log = logging.getLogger(__name__)
@@ -450,7 +450,7 @@ def run(
             "mid_market_enterprise_count": null_state_info["hv_count"],
             "size_breakdown": null_state_info["size_breakdown"],
             "gap_tier": "state_unknown",
-            "phase4_treatment": "include_in_enrichment_without_state_filter",
+            "part4_treatment": "include_in_enrichment_without_state_filter",
         },
         "summary": summary,
         "gap_candidates": gap_cells,
@@ -463,7 +463,7 @@ def run(
     log.info(f"Written: {output_path}")
 
     log.info("\n" + "=" * 70)
-    log.info("  PHASE 1.6 GAP DETECTION SUMMARY (SUSB + NES)")
+    log.info("  PART 1.6 GAP DETECTION SUMMARY (SUSB + NES)")
     log.info("=" * 70)
     log.info(f"  States analyzed: {summary['states_analyzed']} (Tier A: {summary['tier_a_states']}, Tier B: {summary['tier_b_states']})")
     log.info(f"  Sectors analyzed: {summary['sectors_analyzed']}")

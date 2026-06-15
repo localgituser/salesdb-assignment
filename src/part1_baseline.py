@@ -19,7 +19,7 @@ import duckdb
 import logging
 from pathlib import Path
 
-from src.config import CONFIG
+from src.shared.config import CONFIG
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 log = logging.getLogger(__name__)

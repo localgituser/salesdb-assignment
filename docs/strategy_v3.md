@@ -1,12 +1,12 @@
 # Regional Data Lead Assessment — Execution Plan (v6)
 
-**Brief source of truth**: `notes/Regional Data Lead — Market Coverage Audit & 90-Day Plan _ Notion.md`
+**Brief source of truth**: `docs/PROJECT-GUIDELINES.md`
 
-Each phase below maps explicitly to its corresponding Part in the brief. Phase numbering (0–5) is internal; Part numbering (1–6) is what the assessors evaluate.
+Each phase below maps explicitly to its corresponding Part in the brief. Both use Part numbering (0–6) is what the assessors evaluate.
 
-Total time budget: ~2-3 working days. Part 4 / Phase 4 gets the largest single share. If running behind, cut from the bottom of the priority list (Phase 5 → Phase 3 → Phase 2), never from Phase 4 or Phase 6.
+Total time budget: ~2-3 working days. Part 4 / Phase 4 gets the largest single share. If running behind, cut from the bottom of the priority list (Part 5 → Part 3 → Part 2), never from Part 4 or Part 6.
 
-LLM budget: **self-imposed $10 ceiling** (the brief sets no budget — this is a discipline constraint). Per-phase caps live in `config/project.yaml` → `budget.per_phase_usd`. The phase headers below mirror those values; if they diverge, the YAML wins. If a phase's sub-budget is exhausted, stop that phase's LLM calls, log it, and move on — never let an early overrun block Phase 4.
+LLM budget: **self-imposed $10 ceiling** (the brief sets no budget — this is a discipline constraint). Per-phase caps live in `config/project.yaml` → `budget.per_part_usd`. The part headers below mirror those values; if they diverge, the YAML wins. If a part's sub-budget is exhausted, stop that phase's LLM calls, log it, and move on — never let an early overrun block Part 4.
 
 **Tunable parameters** (gap-tier thresholds, geography tier cutoffs, platform blocklist, cascade thresholds, batch size limits, run scope, market dataset/comparator paths) all live in `config/project.yaml`. To rerun this plan against a different market, edit that YAML — no code changes required.
 
@@ -20,35 +20,46 @@ LLM budget: **self-imposed $10 ceiling** (the brief sets no budget — this is a
 ├── data/
 │   ├── raw/
 │   ├── processed/
-│   │   ├── us_companies.parquet        # Phase 0 output (raw, never modified)
-│   │   ├── us_companies_clean.parquet  # Phase 1.5 output (rules-cleaned)
-│   │   ├── sample_audit.parquet        # Phase 1 stratified sample
-│   │   ├── gap_candidates.json         # Phase 1.6 output (annotated by Phase 2 data-engineer)
+│   │   ├── us_companies.parquet        # Part 0 output (raw, never modified)
+│   │   ├── us_companies_clean.parquet  # Part 1.5 output (rules-cleaned)
+│   │   ├── sample_audit.parquet        # Part 1 stratified sample
+│   │   ├── gap_candidates.json         # Part 1.6 output (annotated by Part 2 data-engineer)
 │   │   ├── observability.jsonl         # all LLM call traces
 │   │   └── cost_tracking.json          # running cost totals
 │   └── enriched/
-│       └── poc_enriched_sample.parquet # Phase 4 output
+│       └── poc_enriched_sample.parquet # Part 4 output
 ├── src/
-│   ├── config.py             # typed loader for project.yaml
-│   ├── ingestion.py
-│   ├── sampling.py
-│   ├── rules.py              # Phase 1.5 deterministic cleanup
-│   ├── comparator.py         # SUSB state-level comparison
-│   ├── nes_comparator.py     # SUSB+NES combined industry comparison
-│   ├── gap_detection.py      # Phase 1.6 state×industry cross-tab → gap_candidates.json
-│   ├── pipeline.py           # Phase 4 cascade enrichment
-│   ├── gate.py               # batch quality gate (Phase 4)
-│   └── observability.py
+│   ├── shared/               # config.py, observability.py, rules.py
+│   ├── part0_ingestion.py
+│   ├── part1_baseline.py
+│   ├── part1_sampling.py
+│   ├── part1_comparator.py   # SUSB state-level comparison
+│   ├── part1_nes_comparator.py  # SUSB+NES combined industry comparison
+│   ├── part1_gap_detection.py   # Part 1.6 state×industry cross-tab → gap_candidates.json
+│   ├── part1_industry_mapper.py
+│   ├── part2_audit.py        # Part 2 data-engineer role
+│   ├── part2_verify.py       # Part 2 verifier role
+│   ├── part4_pipeline.py     # Part 4 cascade enrichment
+│   └── part4_gate.py         # batch quality gate (Part 4)
 ├── prompts/
-│   ├── audit_v1.txt
-│   └── enrichment_v1.txt
+│   ├── part2_audit_v1.txt
+│   ├── part2_audit_synthesis_v1.txt
+│   ├── part2_record_audit_v1.txt
+│   └── part4_enrichment_v1.txt
 ├── evals/
 │   ├── ground_truth.json     # 20-25 hand-labeled records (static)
 │   └── eval_runner.py
-├── notes/
-│   ├── part1_baseline_observations.md
-│   ├── gap_findings.md       # Phase 2 verifier output
-│   └── strategy_v3.md        # this file
+├── docs/
+│   ├── part1-baseline.md     # Part 1 deliverable
+│   ├── part2-audit.md        # Part 2 deliverable
+│   ├── part3-commercial.md   # Part 3 deliverable
+│   ├── part4-enrichment.md   # Part 4 deliverable
+│   ├── part5-skill.md        # Part 5 deliverable
+│   ├── part6-plan.md         # Part 6 deliverable
+│   ├── part0-discovery.md    # Part 0 discovery notes
+│   ├── strategy_v3.md        # this file
+│   ├── db_schema.md
+│   └── PROJECT-GUIDELINES.md
 ├── .claude/
 │   ├── agents/               # data-profiler, data-engineer, verifier specs
 │   └── skills/coverage-audit/SKILL.md
@@ -59,7 +70,7 @@ LLM budget: **self-imposed $10 ceiling** (the brief sets no budget — this is a
 
 ---
 
-## Phase 0 — Setup
+## Part 0 — Setup
 **→ Brief: preamble / infrastructure (not a scored Part, but gates everything)**
 Target: 30 min | Budget: $0
 
@@ -68,14 +79,14 @@ Target: 30 min | Budget: $0
 - Pull external comparators: **SUSB 2022** (Statistics of U.S. Businesses — employer firms) + **NES 2023** (Nonemployer Statistics — sole proprietors/self-employed). Combined ~36.9M business universe.
 - **Census CBP rejected**: CBP counts physical establishment locations, not legal companies. A multi-location company appears as N CBP records but 1 SUSB record — wrong denominator for a company-level audit.
 - **5-minute sanity check only**: do state codes match format-wise? Are comparator numbers in the right order of magnitude? Note any mismatch in one sentence in `baseline_audit.md`.
-- **External augmentation decision (state once, don't revisit)**: Decision for this submission: use SUSB + NES as the sole comparators (free, stable, no scraping risk). Tradeoff: NES 2023 / SUSB 2022 vintage mismatch means ratios are directional only; NES counts legal entities, our dataset may count practitioners individually. Documented in `data/processed/baseline_audit.md`.
-- Set up `src/observability.py`: JSONL logger (timestamp, phase, model, tokens, cost, prompt_version, outcome) + running cost total written to `data/processed/cost_tracking.json`, checked at the start of each LLM phase script.
+- **External augmentation decision (state once, don't revisit)**: Decision for this submission: use SUSB + NES as the sole comparators (free, stable, no scraping risk). Tradeoff: NES 2023 / SUSB 2022 vintage mismatch means ratios are directional only; NES counts legal entities, our dataset may count practitioners individually. Documented in `docs/part0-discovery.md`.
+- Set up `src/shared/observability.py`: JSONL logger (timestamp, phase, model, tokens, cost, prompt_version, outcome) + running cost total written to `data/processed/cost_tracking.json`, checked at the start of each LLM part script.
 
 **Output:** working DuckDB/Parquet pipeline, logger stub, one-paragraph comparator note with augmentation decision.
 
 ---
 
-## Phase 1 — Baseline & Stratification
+## Part 1 — Baseline & Stratification
 **→ Brief: Part 1 "Scope & Baseline"**
 Target: 1-2 hrs | Budget: $0 (all rules-based)
 
@@ -97,31 +108,31 @@ Write `baseline_audit.md`:
 - sampling/stratification approach (1 paragraph) — including *why* 15-record spot-checks per gap give a defensible signal (at expected gap prevalence ≥20%, n=15 yields ~95% power to detect the gap above noise)
 - coverage parity definition: which attributes (name, website, industry, employee range, location), at what fill rates (e.g. ≥85% for name/state, ≥60% for website), at what accuracy standard, and how this varies by state tier (Tier A = full parity target, Tier B = directional target, Tier C = excluded)
 
-**Phase 1.5 — Deterministic Cleanup Gate** (no LLM, $0): Run `src/rules.py` before Phase 2 to produce `us_companies_clean.parquet`. Rules: state normalisation (case, abbreviation, city-leak recombine), website platform/institutional-TLD reclassification, founded pre-1800 null-out, name garbage/sentinel null-out, city junk null-out. Adds `rules_flags` column + three boolean flag columns (`has_non_latin_name`, `implausible_size_founded`, `has_shared_domain`). All Phase 2–4 scripts read from the clean parquet, not the raw one.
+**Part 1.5 — Deterministic Cleanup Gate** (no LLM, $0): Run `src/shared/rules.py` before Part 2 to produce `us_companies_clean.parquet`. Rules: state normalisation (case, abbreviation, city-leak recombine), website platform/institutional-TLD reclassification, founded pre-1800 null-out, name garbage/sentinel null-out, city junk null-out. Adds `rules_flags` column + three boolean flag columns (`has_non_latin_name`, `implausible_size_founded`, `has_shared_domain`). All Part 2–4 scripts read from the clean parquet, not the raw one.
 
-**Phase 1.6 — Deterministic Gap Detection** (no LLM, $0): Run `src/gap_detection.py` to produce the ranked gap candidate list via pure arithmetic — `our_count / SUSB_count` per state×industry and state×size band. Output: `data/processed/gap_candidates.json` (gap tier per cell: HIGH/MODERATE/ADEQUATE). This is SQL/Python only; no judgment calls. Phase 2 consumes this file as input — it does not re-derive gaps from SUSB.
+**Part 1.6 — Deterministic Gap Detection** (no LLM, $0): Run `src/part1_gap_detection.py` to produce the ranked gap candidate list via pure arithmetic — `our_count / SUSB_count` per state×industry and state×size band. Output: `data/processed/gap_candidates.json` (gap tier per cell: HIGH/MODERATE/ADEQUATE). This is SQL/Python only; no judgment calls. Part 2 consumes this file as input — it does not re-derive gaps from SUSB.
 
 **Output:** `baseline_audit.md`, `data/processed/sample_audit.parquet`, `data/processed/us_companies_clean.parquet`, `data/processed/gap_candidates.json`
 
 ---
 
-## Phase 2 — Agentic Audit
+## Part 2 — Agentic Audit
 **→ Brief: Part 2 "Agentic Coverage & Quality Audit"**
 Target: 2-3 hrs | Budget: $3
 
-**Separation of roles is the point here** — the brief explicitly tests trust calibration. The deterministic gap list already exists from Phase 1.6; Phase 2 is purely LLM judgment and spot-checks on top of it.
+**Separation of roles is the point here** — the brief explicitly tests trust calibration. The deterministic gap list already exists from Part 1.6; Part 2 is purely LLM judgment and spot-checks on top of it.
 
-- **Input**: `data/processed/gap_candidates.json` (from Phase 1.6). Do not re-derive gaps from SUSB — that work is done.
+- **Input**: `data/processed/gap_candidates.json` (from Part 1.6). Do not re-derive gaps from SUSB — that work is done.
 - **data-engineer subagent**: for each gap candidate, uses LLM to add commercial reasoning, assess whether the gap is a sourcing gap vs. enrichment opportunity, and assign a confidence score. Annotates `gap_candidates.json` in-place (adds `reasoning`, `gap_type`, `confidence` fields).
-- **verifier subagent**: independently spot-checks 15 records per candidate gap against raw data. Produces `notes/gap_findings.md`.
+- **verifier subagent**: independently spot-checks 15 records per candidate gap against raw data. Produces `docs/part2-audit.md`.
 - Every model call logged to `data/processed/observability.jsonl` (prompt_version, model, latency, cost, outcome). This is the submission's trace artifact.
 - `gap_findings.md` must contain, per gap: what's missing, prevalence, confidence, "agent claimed X / spot-check found Y" — even when they agree. Silent agreement suppresses a useful signal.
 
-**Output:** `notes/gap_findings.md`, annotated `data/processed/gap_candidates.json`, traces in `data/processed/observability.jsonl`
+**Output:** `docs/part2-audit.md`, annotated `data/processed/gap_candidates.json`, traces in `data/processed/observability.jsonl`
 
 ---
 
-## Phase 3 — Commercial Framing
+## Part 3 — Commercial Framing
 **→ Brief: Part 3 "Commercial Framing"**
 Target: 1 hr | Budget: $0 (no LLM needed)
 
@@ -133,11 +144,11 @@ Target: 1 hr | Budget: $0 (no LLM needed)
 
 ---
 
-## Phase 4 — PoC Enrichment Pipeline
+## Part 4 — PoC Enrichment Pipeline
 **→ Brief: Part 4 "Build the PoC Enrichment Pipeline" (the main event)**
 Target: 4-6 hrs | Budget: $5
 
-Build cascade in `src/pipeline.py`. **Fill this table in before writing code:**
+Build cascade in `src/part4_pipeline.py`. **Fill this table in before writing code:**
 
 | Stage | Task | Model | Why |
 |---|---|---|---|
@@ -165,7 +176,7 @@ Build cascade in `src/pipeline.py`. **Fill this table in before writing code:**
 
 ---
 
-## Phase 5 — Reusable Skill
+## Part 5 — Reusable Skill
 **→ Brief: Part 5 "Reusable Skill"**
 Target: 1 hr | Budget: $0
 
@@ -177,11 +188,11 @@ Target: 1 hr | Budget: $0
 
 ---
 
-## Phase 6 — 90-Day Pod Plan
+## Part 6 — 90-Day Pod Plan
 **→ Brief: Part 6 "The 90-Day Pod Plan"**
 Target: 1-2 hrs | Budget: $0
 
-Write **last**, using real numbers from Phases 1-4. Must match brief's exact format (1-2 pages max):
+Write **last**, using real numbers from Parts 1–4. Must match brief's exact format (1-2 pages max):
 
 - **Thesis** — 1 paragraph. The bet, why now, what success looks like.
 - **3 measurable outcomes** — metric, starting value (from audit), day-90 target.
@@ -196,13 +207,13 @@ Write **last**, using real numbers from Phases 1-4. Must match brief's exact for
 ## Loom walkthrough
 **→ Brief: "strongly encouraged; candidates who skip are at a disadvantage"**
 
-Treat as near-mandatory. Record while building Phase 4 — that's where the agentic dev loop is most visible and most relevant to the role. Target ≤7 min. Show: how you direct agents, how you read traces, how you make the Haiku-vs-Sonnet call decision in real time.
+Treat as near-mandatory. Record while building Part 4 — that's where the agentic dev loop is most visible and most relevant to the role. Target ≤7 min. Show: how you direct agents, how you read traces, how you make the Haiku-vs-Sonnet call decision in real time.
 
 ---
 
 ## Trace artifact — single source of truth
 
-All LLM call logs go to **`data/processed/observability.jsonl`**. This is the file cited in submission as the trace record. Do not create a separate `agent_traces.jsonl` — consolidate into observability.jsonl, filtered by phase tag if needed.
+All LLM call logs go to **`data/processed/observability.jsonl`**. This is the file cited in submission as the trace record. Do not create a separate `agent_traces.jsonl` — consolidate into observability.jsonl, filtered by part tag if needed.
 
 ---
 
@@ -215,7 +226,7 @@ All LLM call logs go to **`data/processed/observability.jsonl`**. This is the fi
 ---
 
 ## Cut list if behind schedule (in order matching brief's priority)
-1. Phase 5 (Reusable Skill) — can be a stub if truly out of time
-2. Phase 3 (Commercial Framing) — compress to 1-2 sentences per gap
+1. Part 5 (Reusable Skill) — can be a stub if truly out of time
+2. Part 3 (Commercial Framing) — compress to 1-2 sentences per gap
 3. Phase 2 (Agentic Audit) — reduce to top 3 gaps instead of 5
-4. **Never cut Phase 4 or Phase 6**
+4. **Never cut Part 4 or Part 6**

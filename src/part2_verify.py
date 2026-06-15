@@ -1,7 +1,7 @@
 """
-Phase 2 — Verifier Spot-Check (verifier role)
+Part 2 — Verifier Spot-Check (verifier role)
 
-Reads phase2_audit_raw.json (data-engineer output).
+Reads part2_audit_raw.json (data-engineer output).
 For each of the top 5 gaps, independently re-derives gap evidence from
 us_companies_clean.parquet using DuckDB SQL — no LLM calls.
 
@@ -12,9 +12,9 @@ Spot-check protocol (n=15 per gap):
   - Renders a trust verdict: CONFIRMED / PLAUSIBLE / OVERSTATED / ARTIFACT
 
 Writes:
-  notes/gap_findings.md   — final human-readable findings (agent + verifier sections)
+  docs/part2-audit.md   — final human-readable findings (agent + verifier sections)
 
-Does NOT modify phase2_audit_raw.json or gap_candidates.json.
+Does NOT modify part2_audit_raw.json or gap_candidates.json.
 """
 
 import json
@@ -27,18 +27,17 @@ from datetime import datetime, timezone
 import duckdb
 import pandas as pd
 
-sys.path.insert(0, str(Path(__file__).parent))
-from config import CONFIG
+from src.shared.config import CONFIG
 
 logging.basicConfig(level=logging.INFO, stream=sys.stderr,
                     format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
 PROCESSED_DIR = Path(__file__).parent.parent / "data" / "processed"
-NOTES_DIR = Path(__file__).parent.parent / "notes"
-AUDIT_RAW_PATH = PROCESSED_DIR / "phase2_audit_raw.json"
+DOCS_DIR = Path(__file__).parent.parent / "docs"
+AUDIT_RAW_PATH = PROCESSED_DIR / "part2_audit_raw.json"
 CLEAN_PARQUET = PROCESSED_DIR / "us_companies_clean.parquet"
-GAP_FINDINGS_PATH = NOTES_DIR / "gap_findings.md"
+GAP_FINDINGS_PATH = DOCS_DIR / "part2-audit.md"
 
 SPOT_CHECK_N = CONFIG.eval.spot_check_n_per_gap
 OVERSTATED_THRESHOLD = 0.30  # if our observed rate is >30% higher than claimed, flag
@@ -52,7 +51,7 @@ def _parse_prevalence_pct(prevalence: str) -> float:
 
 def load_audit_raw() -> dict:
     if not AUDIT_RAW_PATH.exists():
-        logger.error(f"{AUDIT_RAW_PATH} not found. Run phase2_audit.py first.")
+        logger.error(f"{AUDIT_RAW_PATH} not found. Run part2_audit.py first.")
         sys.exit(1)
     with open(AUDIT_RAW_PATH) as f:
         return json.load(f)
@@ -111,7 +110,7 @@ def spot_check_gap(
         FROM read_parquet('{CLEAN_PARQUET}')
         WHERE state IS NOT NULL
           AND {industry_filter}
-        ORDER BY hash(handle || 'phase2_verify_seed')
+        ORDER BY hash(handle || 'part2_verify_seed')
         LIMIT {SPOT_CHECK_N}
     """
     logger.info(f"[SQL:sample] NAICS {naics_code}\n{sample_sql.strip()}")
@@ -225,7 +224,7 @@ def render_gap_findings_md(
     synthesis = audit_raw.get("sonnet_synthesis", {})
     haiku = audit_raw.get("haiku_ranking", {})
     top5 = synthesis.get("top_5_gaps", [])
-    total_cost = audit_raw.get("total_phase2_cost", 0.0)
+    total_cost = audit_raw.get("total_part2_cost", 0.0)
 
     lines = [
         "# Phase 2 — Agentic Coverage & Quality Audit Findings",
@@ -288,9 +287,9 @@ def render_gap_findings_md(
     if cross:
         lines += ["**Cross-gap pattern**: " + cross, ""]
 
-    rec = synthesis.get("recommended_phase4_target", "")
+    rec = synthesis.get("recommended_part4_target", "")
     if rec:
-        lines += [f"**Recommended Phase 4 target**: {rec}", ""]
+        lines += [f"**Recommended Part 4 target**: {rec}", ""]
 
     lines += [
         "---",
@@ -396,11 +395,11 @@ def main():
     audit_raw = load_audit_raw()
     synthesis = audit_raw.get("sonnet_synthesis", {})
     top5 = synthesis.get("top_5_gaps", [])
-    # actionable_sectors is the key written by phase2_audit.py
+    # actionable_sectors is the key written by part2_audit.py
     actionable_sectors = audit_raw.get("actionable_sectors", [])
 
     if not top5:
-        logger.error("No top_5_gaps in phase2_audit_raw.json — run phase2_audit.py first.")
+        logger.error("No top_5_gaps in part2_audit_raw.json — run part2_audit.py first.")
         sys.exit(1)
 
     con = duckdb.connect()

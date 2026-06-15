@@ -1,7 +1,7 @@
 """Typed loader for config/project.yaml — single source of truth for project parameters.
 
 Usage:
-    from src.config import CONFIG
+    from src.shared.config import CONFIG
     CONFIG.budget.total_usd          # 10.00
     CONFIG.gap_tiers.high_gap_max    # 0.10
     CONFIG.market.enrichable_size_bands  # frozenset of size band strings
@@ -17,12 +17,12 @@ from typing import Dict, FrozenSet, List, Optional
 import yaml
 from pydantic import BaseModel, Field
 
-CONFIG_PATH = Path(__file__).resolve().parent.parent / "config" / "project.yaml"
+CONFIG_PATH = Path(__file__).resolve().parent.parent.parent / "config" / "project.yaml"
 
 
 class Budget(BaseModel):
     total_usd: float
-    per_phase_usd: Dict[str, float]
+    per_part_usd: Dict[str, float]
 
 
 class ModelPricing(BaseModel):

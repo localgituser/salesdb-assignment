@@ -10,13 +10,13 @@ budget:
   # does not specify a budget ("Use whatever models, tools, and infrastructure
   # you want"). This number is a constraint we chose, not a brief requirement.
   total_usd: 10.00
-  per_phase_usd:
-    phase_0: 0.00
-    phase_1: 0.00
-    phase_2: 5.00
-    phase_3: 0.00
-    phase_4: 5.00
-    phase_5: 0.00
+  per_part_usd:
+    part_0: 0.00
+    part_1: 0.00
+    part_2: 5.00
+    part_3: 0.00
+    part_4: 5.00
+    part_5: 0.00
 
 models:
   classification: claude-haiku-4-5-20251001   # cheap, high-volume verification

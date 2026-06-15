@@ -1,5 +1,5 @@
 """
-Phase 1 — NES + SUSB Combined Industry Coverage Comparator
+Part 1 — NES + SUSB Combined Industry Coverage Comparator
 
 Combines US Census SUSB 2022 (employer firms) and NES 2023 (non-employer
 establishments) to produce a total business universe denominator, then
@@ -11,7 +11,7 @@ like Information, Arts, and Education are over-represented in our dataset
 relative to SUSB alone because our source platform captures individual
 operators that SUSB misses.
 
-Output: appends combined coverage section to data/processed/baseline_audit.md
+Output: appends combined coverage section to docs/part0-discovery.md
 """
 
 import duckdb
@@ -26,10 +26,10 @@ log = logging.getLogger(__name__)
 SUSB_CSV = "data/raw/us_state_6digitnaics_2022.csv"
 NES_TXT = "data/raw/nonemp23st.txt"
 PARQUET = "data/processed/us_companies.parquet"
-AUDIT_MD = "data/processed/baseline_audit.md"
+AUDIT_MD = "docs/part0-discovery.md"
 MAPPING_CACHE = "data/processed/industry_naics_mapping.json"
 
-# All NAICS sector codes (must match industry_mapper.py)
+# All NAICS sector codes (must match part1_industry_mapper.py)
 NAICS_SECTORS = {
     "11": "Agriculture, Forestry, Fishing and Hunting",
     "21": "Mining, Quarrying, and Oil and Gas Extraction",
@@ -123,7 +123,7 @@ def load_our_naics_counts(parquet: str, mapping_cache: str) -> pd.DataFrame:
 
     if not Path(mapping_cache).exists():
         raise FileNotFoundError(
-            f"Mapping cache not found: {mapping_cache}. Run src/industry_mapper.py first."
+            f"Mapping cache not found: {mapping_cache}. Run src/part1_industry_mapper.py first."
         )
     with open(mapping_cache) as f:
         label_to_naics = json.load(f)
@@ -178,7 +178,7 @@ def build_combined_coverage(
 
 
 def _gap_tier(ratio: float) -> str:
-    from src.config import CONFIG
+    from src.shared.config import CONFIG
     return CONFIG.gap_tiers.classify(ratio)
 
 

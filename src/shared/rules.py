@@ -23,10 +23,9 @@ from urllib.parse import urlparse
 import duckdb
 import pandas as pd
 
-ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT))
+ROOT = Path(__file__).resolve().parent.parent.parent
 
-from src.config import CONFIG
+from src.shared.config import CONFIG
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
