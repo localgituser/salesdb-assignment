@@ -331,6 +331,34 @@ def render_gap_findings_md(
             "",
         ]
 
+    record_qf = audit_raw.get("record_quality_findings", {})
+    if record_qf:
+        n_audited = record_qf.get("total_records_audited", 0)
+        n_per = record_qf.get("n_per_gap", 100)
+        lines += [
+            "---",
+            "",
+            f"## Record-Level Quality Observations (Haiku, n≈{n_audited})",
+            "",
+            f"Sampled from top-5 gap sectors, stratified by state (10 worst-covered Tier A + 5 Tier B states) "
+            f"and size band. n={n_per} per gap. "
+            "Haiku assessed each record for semantic quality issues that rules can't detect "
+            "(website–company mismatch, industry mislabelling, platform URL misses, data anomalies).",
+            "",
+            "| Gap | Records Sampled | States Covered | Issues Found | Top Issues |",
+            "|---|---|---|---|---|",
+        ]
+        for gap_key, gd in record_qf.get("by_gap", {}).items():
+            n_states = len(gd.get("states_sampled", []))
+            n_issues = gd.get("issues_found", 0)
+            ic = gd.get("issue_counts", {})
+            top_issues = ", ".join(
+                f"{k} ({v})" for k, v in sorted(ic.items(), key=lambda x: -x[1])[:3]
+            ) or "none"
+            label = f"{gd.get('naics_desc', gap_key)} (NAICS {gd.get('naics_code', 'N/A')})"
+            lines.append(f"| {label} | {gd.get('records_sampled', 0)} | {n_states} | {n_issues} | {top_issues} |")
+        lines += [""]
+
     lines += [
         "---",
         "",

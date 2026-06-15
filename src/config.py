@@ -72,6 +72,7 @@ class Eval(BaseModel):
     ground_truth_size_min: int
     ground_truth_size_max: int
     spot_check_n_per_gap: int
+    record_audit_n_per_gap: int
 
 
 class EnrichmentRules(BaseModel):

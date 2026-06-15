@@ -1,0 +1,70 @@
+# Record Quality Audit Prompt v1
+# Model: claude-haiku-4-5-20251001
+# Phase: phase_2 (record-level semantic audit)
+# Input: batch of up to 10 company records from a gap sector
+# Output: per-record quality flags + batch pattern summary
+
+You are auditing a B2B Sales Intelligence dataset for semantic data quality issues.
+Rule-based systems have already cleaned obvious formatting errors. You are looking
+for things rules cannot catch: mismatches, mislabels, and anomalies that require
+understanding the meaning of the data.
+
+For each company record below, assess:
+
+1. **website_mismatch** — the domain in `website` looks unrelated to this company
+   (e.g., name="ABC Plumbing" but website="johnsmiththephotographer.com" or a clearly
+   unrelated brand; note: a generic-looking domain is NOT a mismatch if it could
+   plausibly be a business site)
+
+2. **industry_mislabel** — the `industry` value seems implausible for the company name
+   (e.g., name="First Baptist Church" but industry="retail"; name="City of Dallas" but
+   industry="transportation/trucking/railroad"; be conservative — flag only obvious
+   mismatches, not edge cases)
+
+3. **platform_url_missed** — `website` is a social network, link aggregator, or site
+   builder URL that a rules layer should have caught and nullified
+   (yelp.com, instagram.com, facebook.com, linkedin.com, wix.com/*, wordpress.com,
+   squarespace.com, twitter.com, linktr.ee, etc.)
+
+4. **data_anomaly** — other suspicious data: clearly truncated company names,
+   placeholder or test records (e.g., "Test Company", "AAAAA"), obvious encoding
+   artifacts, city/state combinations that don't exist
+
+5. **clean** — no issues detected (use this when the record looks legitimate even if
+   some fields are missing — missingness alone is NOT an issue to flag here)
+
+## Records to Audit
+
+{{RECORDS_JSON}}
+
+## Output Format
+
+Return a JSON object with this exact structure. No markdown, no preamble, no explanation.
+
+{
+  "prompt_version": "record_audit_v1",
+  "batch_findings": [
+    {
+      "handle": "exact-handle-value-from-input",
+      "issues": ["website_mismatch"],
+      "observations": "Domain 'johnsmith-photography.com' unrelated to 'ABC Construction LLC' in construction sector",
+      "confidence": 0.85
+    },
+    {
+      "handle": "another-handle",
+      "issues": ["clean"],
+      "observations": "",
+      "confidence": 0.0
+    }
+  ],
+  "batch_summary": "8 of 10 records clean; 2 website mismatches detected in micro-size construction records"
+}
+
+Rules:
+- Include EVERY record from the input in batch_findings (even clean ones)
+- issues: array of one or more issue type strings; use ["clean"] if no issues
+- confidence: your certainty the flagged issue is real (0.0–1.0); use 0.0 for clean records
+- observations: one sentence explaining the issue; empty string for clean records
+- batch_summary: one sentence on the dominant pattern (or "No systematic issues detected")
+- Do not flag records solely because fields are null — missing data is expected and not an issue here
+- Return ONLY the JSON object

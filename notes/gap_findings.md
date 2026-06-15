@@ -1,8 +1,8 @@
 # Phase 2 — Agentic Coverage & Quality Audit Findings
-_Generated: 2026-06-15 01:48 UTC_
+_Generated: 2026-06-15 02:17 UTC_
 _Models: claude-haiku-4-5-20251001 (sector ranking) + claude-sonnet-4-6 (synthesis)_
 _Prompt versions: audit_v1 / audit_synthesis_v1_
-_Phase 2 LLM cost: $0.1729_
+_Phase 2 LLM cost: $0.3653_
 _Spot-check: n=15 per gap, pure SQL, no LLM_
 
 ---
@@ -225,6 +225,20 @@ SELECT handle, name, city, state, industry, size, website, founded, type
 ```
 
 </details>
+
+---
+
+## Record-Level Quality Observations (Haiku, n≈496)
+
+Sampled from top-5 gap sectors, stratified by state (10 worst-covered Tier A + 5 Tier B states) and size band. n=100 per gap. Haiku assessed each record for semantic quality issues that rules can't detect (website–company mismatch, industry mislabelling, platform URL misses, data anomalies).
+
+| Gap | Records Sampled | States Covered | Issues Found | Top Issues |
+|---|---|---|---|---|
+| Transportation and Warehousing (NAICS 48-49) | 99 | 14 | 31 | industry_mislabel (18), website_mismatch (5), data_anomaly (5) |
+| Construction (NAICS 23) | 98 | 15 | 23 | industry_mislabel (10), website_mismatch (8), data_anomaly (5) |
+| Retail Trade (NAICS 44-45) | 99 | 15 | 29 | industry_mislabel (18), website_mismatch (8), data_anomaly (2) |
+| None (NAICS None) | 100 | 28 | 27 | industry_mislabel (10), website_mismatch (9), data_anomaly (8) |
+| Transportation and Warehousing (micro-firm band, with Restaurants as secondary cross) (NAICS 48-49) | 100 | 9 | 27 | industry_mislabel (16), website_mismatch (6), data_anomaly (4) |
 
 ---
 
