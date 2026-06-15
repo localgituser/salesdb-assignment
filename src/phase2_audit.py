@@ -233,12 +233,18 @@ def call_llm(
     t0 = time.time()
     response = client.messages.create(
         model=model,
-        max_tokens=2048,
+        max_tokens=4096,
         messages=[{"role": "user", "content": prompt}],
     )
     latency_ms = int((time.time() - t0) * 1000)
 
-    text = response.content[0].text
+    text = response.content[0].text.strip()
+    # Strip markdown code fences if the model wrapped its JSON output
+    if text.startswith("```"):
+        text = text.split("```", 2)[1]
+        if text.startswith("json"):
+            text = text[4:]
+        text = text.rsplit("```", 1)[0].strip()
     usage = {
         "input_tokens": response.usage.input_tokens,
         "output_tokens": response.usage.output_tokens,

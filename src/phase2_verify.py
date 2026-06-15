@@ -152,10 +152,14 @@ def spot_check_gap(
     }
 
 
+SUSB_ADEQUATE_THRESHOLD = 35.0  # mirrors NES_THRESHOLD / SUSB_ADEQUATE_THRESHOLD in phase2_audit
+
+
 def derive_trust_verdict(
     spot_check: dict,
     claimed_coverage_pct: float,
     nes_share_pct: float,
+    coverage_vs_susb_pct: float = 0.0,
 ) -> tuple[str, str]:
     """
     Return (verdict, rationale) based on spot-check observations.
@@ -167,13 +171,23 @@ def derive_trust_verdict(
     """
     sector_total = spot_check["sector_total_in_dataset"]
 
-    # If NES dominates the comparator and sector is sole-prop dominated, flag as artifact
-    if nes_share_pct > 70:
+    # ARTIFACT only when NES dominates AND employer-firm coverage is adequate.
+    # Mirrors the pre-filter in phase2_audit.py: sectors with NES > 70% but
+    # coverage_vs_susb < 35% were left actionable because a real employer gap exists.
+    if nes_share_pct > 70 and coverage_vs_susb_pct >= SUSB_ADEQUATE_THRESHOLD:
         return (
             "ARTIFACT",
-            f"NES non-employers make up {nes_share_pct:.0f}% of comparator. "
-            "Gap is structural sourcing limit (sole proprietors absent from LinkedIn-style data), "
-            "not an enrichment opportunity.",
+            f"NES non-employers make up {nes_share_pct:.0f}% of comparator and "
+            f"employer-firm coverage is {coverage_vs_susb_pct:.1f}% (adequate). "
+            "Gap is structural sourcing limit, not an enrichment opportunity.",
+        )
+
+    # NES-heavy but employer gap is real — flag the inflation caveat
+    if nes_share_pct > 70:
+        return (
+            "CONFIRMED",
+            f"NES inflates comparator ({nes_share_pct:.0f}% non-employers) but employer-firm "
+            f"coverage vs. SUSB is only {coverage_vs_susb_pct:.1f}% — real sourcing gap confirmed.",
         )
 
     # If we found essentially no records in this sector, gap is likely real
@@ -352,9 +366,13 @@ def main():
 
     con = duckdb.connect()
 
-    # Build NES share lookup from actionable_sectors (written by phase2_audit.py)
+    # Build sector-level lookups from actionable_sectors (written by phase2_audit.py)
     nes_share_by_naics = {
         s["naics_code"]: s.get("nes_share_of_comparator_pct", 0.0)
+        for s in actionable_sectors
+    }
+    susb_coverage_by_naics = {
+        s["naics_code"]: s.get("coverage_vs_susb_only_pct", 0.0)
         for s in actionable_sectors
     }
 
@@ -362,16 +380,45 @@ def main():
     verdicts = []
 
     for gap in top5:
-        naics_code = str(gap.get("naics_code", ""))
+        raw_naics = gap.get("naics_code")
         naics_desc = gap.get("naics_desc", "")
+
+        # Sonnet may emit a size-dimension insight with no NAICS code.
+        # These can't be verified via sector SQL — log and skip the spot-check.
+        if raw_naics is None or not str(raw_naics).strip():
+            logger.info(f"Gap '{gap.get('headline', '')}' has no NAICS code — size-dimension insight, skipping SQL spot-check")
+            sc = {
+                "gap_id": gap.get("gap_id", "size_dimension"),
+                "naics_code": "N/A",
+                "naics_desc": naics_desc or "Size-dimension gap",
+                "industry_labels_matched": [],
+                "sector_total_in_dataset": 0,
+                "spot_check_n": 0,
+                "sql_count": "",
+                "sql_sample": "",
+                "sample_fill_rates": {},
+                "sample_state_distribution": {},
+                "sample_size_distribution": {},
+                "sample_records": [],
+            }
+            spot_checks.append(sc)
+            verdicts.append((
+                "PLAUSIBLE",
+                "Size-dimension gap — no NAICS code; verified via Phase 1 size quality summary "
+                f"(enterprise 1.65% of records, website fill 80.9%). SQL spot-check not applicable.",
+            ))
+            continue
+
+        naics_code = str(raw_naics)
         logger.info(f"Spot-checking NAICS {naics_code} — {naics_desc}")
 
         sc = spot_check_gap(con, gap, naics_code, naics_desc)
         spot_checks.append(sc)
 
         nes_share = nes_share_by_naics.get(naics_code, 0.0)
+        susb_coverage = susb_coverage_by_naics.get(naics_code, 0.0)
         claimed_pct = _parse_prevalence_pct(gap.get("prevalence", "0"))
-        verdict, rationale = derive_trust_verdict(sc, claimed_pct, nes_share)
+        verdict, rationale = derive_trust_verdict(sc, claimed_pct, nes_share, susb_coverage)
         verdicts.append((verdict, rationale))
 
         logger.info(f"  → {verdict}: {rationale[:80]}")
