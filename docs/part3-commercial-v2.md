@@ -149,3 +149,171 @@ Industry semantic dedup (cleanup)
 | **Founded year via paid API** | Expensive per-record cost with no deterministic fallback. Won't in this window. |
 
 ---
+
+## Implementation Approach
+
+### Phase 0 — Deterministic cleanup (runs before any enrichment spend)
+
+Two Must items have free, deterministic solutions and no dependencies. Both must complete and produce a clean `part0_companies_clean.parquet` before the pipeline runs.
+
+**Issue 1 — Cleanup pre-pass**
+
+Extend `config/project.yaml → enrichment_rules.platform_blocklist` with the categories identified above (site builders, GMB, e-commerce platforms, content/media, community platforms, directory listings, URL shorteners, email-as-URL). Add regex support to `src/shared/rules.py` for subdomain patterns (`*.blogspot.com`) and international suffix variants (`.gov.au`, `yelp.ca` etc.). Franchise domains (`marriott.com`, `hilton.com`, `expresspros.com`, `ajg.com`) are flagged as `WEBSITE_WRONG_ENTITY` and routed to the enrichment queue — not nullified, because the entity is real.
+
+`thetopperson.com` (641 records): null-equivalent — it provides no entity-specific URL content. Reclassify to null and add to enrichment queue.
+
+Cost: $0.
+
+**Issue 3 — State null recovery (deterministic path)**
+
+Join null-state records against an offline US city→state lookup (USPS City/State file or Census ZCTA crosswalk) on normalised city name. Unique matches are applied deterministically. Ambiguous city names (multiple states) are logged as `STATE_AMBIGUOUS` and deferred to the Should-tier LLM tail. Does not require a model call.
+
+Cost: $0.
+
+---
+
+### Phase 1 — Enrichment pipeline (Part 4 PoC)
+
+**Why Issues 2, 4, and 5 collapse into one run**
+
+The original plan treated the data trust Spike (Issue 2) as a separate pre-step. It is not. The Spike's purpose is to validate that the search → LLM verify cascade produces reliable output before spending enrichment budget. The correct way to do that is to *run the cascade on records where we already know the answer* (clean-website population) and measure how often it's right — which is the same run as the Part 4 PoC, just on a different input slice. Separating them doubles the engineering work for no additional signal.
+
+The merged run produces three outputs in one pass:
+1. **Reliability scores on existing values** — for records that already have values, the pipeline runs and compares its findings to the stored values. Match → confirmed. Mismatch → flag as `{FIELD}_SUSPECT`.
+2. **Enriched values for null fields** — website, type, industry, and size filled where missing.
+3. **Per-segment precision/recall** — stratified sample (enterprise / mid-market / SMB / micro) tells us which size bands the cascade is trustworthy for at full scale.
+
+**Target fields and their system taxonomies**
+
+Each field Gemini extracts must use the exact enumeration already in the dataset — no free-text, no synonyms.
+
+| Field | Allowed values (exact) |
+|---|---|
+| `type` | `Privately Held`, `Self-Owned`, `Nonprofit`, `Partnership`, `Public Company`, `Self-Employed`, `Educational`, `Government Agency` |
+| `size` | `1-10`, `11-50`, `51-200`, `201-500`, `501-1K`, `1K-5K`, `5K-10K`, `10K+` |
+| `industry` | 491 lowercase labels (see taxonomy note below) |
+
+**Industry taxonomy note**: 491 labels is too large to enumerate in Gemini's prompt as a constrained enum — the token overhead is ~2,000 tokens per call and Gemini's grounding-based extraction doesn't benefit from a closed label list at retrieval time. The split is:
+- **Gemini Stage 1**: extracts `industry_raw` as a short free-text description of what the company does (2–4 words, from web sources).
+- **Haiku Stage 2**: maps `industry_raw` → the nearest valid taxonomy label, with the full 491-label list passed in the system prompt. Haiku is well-suited to this: it's a classification task on short text with a fixed label space, not a web retrieval task.
+
+`type` and `size` are included directly in Gemini's JSON schema as constrained enums — small enough (~8 values each) to enforce at the extraction layer without token cost.
+
+**Cascade design**
+
+```
+Stage 0 — Rules layer ($0)
+  Input:  name, city, state, existing field values
+  Output: email_domain derived from known website (regex, $0)
+          WEBSITE_WRONG_ENTITY flag for franchise domains → enrichment queue
+          Skip fields that are already confirmed clean (post-cleanup)
+          Pass-through: carry existing non-null values so Stage 1 can
+          score their reliability even when not filling a gap.
+
+Stage 1 — Search + multi-field extraction (Gemini Flash + Google Search Grounding)
+  Input:  name, city, state
+  Output (structured JSON, enforced by schema):
+    candidate_website:    string | null
+    candidate_type:       enum[type values] | null
+    candidate_size:       enum[size bands] | null
+    industry_raw:         string (free-text, 2–4 words) | null
+    field_confidences:    { website: 0–1, type: 0–1, size: 0–1, industry: 0–1 }
+    search_citations:     string[]
+
+  Why Gemini Flash: Google Search Grounding means retrieval is from live web
+  results, not parametric memory — correct for SMB/micro that Haiku/Sonnet
+  would not have seen during training. Structured output API enforces the JSON
+  schema. ~$0.075/M tokens; per-call cost ~$0.0002 (larger prompt than before).
+  Fallback: if grounding returns no usable results, all candidates null,
+  stage=NO_CANDIDATE.
+
+Stage 2 — Verification + industry taxonomy snap (Claude Haiku)
+  Input:  original record fields, Stage 1 candidates, industry_raw
+  Output:
+    website_verified:     yes / no / uncertain
+    type_verified:        yes / no / uncertain  (or accepted if record had no prior value)
+    size_verified:        yes / no / uncertain
+    industry_label:       canonical taxonomy label (snapped from industry_raw)
+    industry_confidence:  0–1
+    per_field_confidence: { website: 0–1, type: 0–1, size: 0–1, industry: 0–1 }
+    reasoning:            one sentence per uncertain field
+
+  Full 491-label taxonomy passed in Haiku system prompt for industry snapping.
+  Haiku is NOT doing web recall — it is (a) judging Gemini's candidates against
+  the record's known identity context, and (b) mapping industry_raw to the
+  nearest label in the closed taxonomy.
+  Per-call cost ~$0.0006 (slightly larger input due to taxonomy list).
+
+Stage 3 — Disagreement resolution (Claude Sonnet) [conditional]
+  Fires when: any field has Haiku verdict = uncertain, OR Gemini and Haiku
+  confidences conflict by > 0.3 on the same field.
+  Input:  full context — original record, Stage 1 candidates + citations,
+          Stage 2 verdicts + reasoning
+  Output: final values for disputed fields, final_confidence per field,
+          resolution_note
+  Why Sonnet: nuanced judgment on ambiguous cases — e.g., a company that
+  operates in two industries, or a franchise location where size and type
+  conflict with the parent brand's signal.
+  Expected to fire on ~15–20% of records. Per-call cost ~$0.004.
+```
+
+**Confidence tiers and field-level output schema**
+
+Confidence is tracked per field, not per record — a record can have HIGH confidence on `website` and LOW on `size` simultaneously.
+
+| Tier | Condition | Action |
+|---|---|---|
+| **HIGH** | Gemini ≥ 0.7 AND Haiku verified AND confidence ≥ 0.8 | Ship field — no further review |
+| **MEDIUM** | Both agree but one below threshold | Ship field with `review_flag = true` |
+| **LOW / ESCALATE** | Haiku uncertain or conflict → Sonnet fires | Ship Sonnet output if ≥ 0.7; else retain existing value (or null if was already null) |
+| **NO_CANDIDATE** | Stage 1 found nothing for this field | Retain existing value unchanged; log |
+
+Every output record carries the following schema. Fields marked **[per field]** repeat for each of `website`, `type`, `industry`, `size`.
+
+| Column | Type | Description |
+|---|---|---|
+| `handle` | string | Primary key — join key back to source dataset |
+| `enriched_at` | ISO 8601 timestamp | When this pipeline run produced the record |
+| `pipeline_version` | string | Version tag of the cascade script (for reproducibility) |
+| `{field}_original` | string \| null | **[per field]** Value as it existed before this run |
+| `{field}_enriched` | string \| null | **[per field]** Value the pipeline produced (null if NO_CANDIDATE) |
+| `{field}_final` | string \| null | **[per field]** Value to write back: enriched if original was null; original if pipeline deferred |
+| `{field}_original_correct` | bool \| null | **[per field]** Did the pipeline agree with the original value? `true` = confirmed, `false` = conflict flagged, `null` = original was null (no prior value to validate) |
+| `{field}_confidence` | float 0–1 | **[per field]** Confidence in `{field}_final` |
+| `{field}_pipeline_stage` | string | **[per field]** Which stage produced the final answer: `rules`, `gemini`, `haiku`, `sonnet`, `NO_CANDIDATE` |
+| `{field}_review_flag` | bool | **[per field]** True if medium-confidence or conflict — needs human spot-check |
+| `enrichment_status` | string | Record-level summary: `FULLY_ENRICHED`, `PARTIALLY_ENRICHED`, `NO_CANDIDATE`, `CONFLICT` |
+
+The `{field}_original_correct` column is the data validity audit trail. Over time, aggregate correctness rates by field × size band give a live measure of how reliable the source population is — not just what's missing, but how wrong the existing values are.
+
+The `handle` is the join key back to the source dataset.
+
+**Eval**
+
+20+ records hand-labelled before the pipeline runs — populates `evals/ground_truth.json` (currently empty). Stratified: 5 enterprise, 5 mid-market, 5 SMB, 5 micro. Ground truth covers all four target fields (website, type, industry, size) so precision/recall is reportable per field per segment.
+
+Ground truth must be hand-labelled — not generated by any model. Using LLM output as ground truth to validate LLM output is circular.
+
+**Cost estimate (288-record PoC)**
+
+| Stage | Calls | Unit cost | Total |
+|---|---|---|---|
+| Stage 1 — Gemini Flash | 288 | ~$0.0002 | ~$0.06 |
+| Stage 2 — Haiku | 288 | ~$0.0006 | ~$0.17 |
+| Stage 3 — Sonnet (~18% of records) | ~52 | ~$0.004 | ~$0.21 |
+| **Total** | | | **~$0.44** |
+
+Well within the $5 Part 4 budget. Remaining budget covers iteration and re-runs.
+
+**Full-scale projection (292K website-null records, post-PoC approval)**
+
+| Stage | Total cost |
+|---|---|
+| Stage 1 — Gemini Flash | ~$58 |
+| Stage 2 — Haiku | ~$175 |
+| Stage 3 — Sonnet (~18%) | ~$215 |
+| **Total** | **~$448** |
+
+Industry and type/size null populations partially overlap with the website-null population, so many records get all four fields filled in a single pipeline pass — no separate industry or type enrichment run needed for those records.
+
+---
