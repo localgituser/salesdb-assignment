@@ -36,10 +36,11 @@ _Script: `src/part1_invalid_states.py` | Comparator: full US state name list (50
 |---|---|---|---|
 | 51–200 | 284,633 | 8,840 | 3.1% |
 | 201–500 | 78,975 | 2,901 | 3.7% |
+| 501–1K | 30,026 | 1,171 | 3.9% |
 | 1K–5K | 27,173 | 1,053 | 3.9% |
 | 5K–10K | 5,529 | 309 | 5.6% |
 | **10K+** | **9,119** | **660** | **7.2%** |
-| **TOTAL (51+)** | **405,429** | **13,763** | **3.4%** |
+| **TOTAL (51+)** | **435,455** | **14,934** | **3.4%** |
 
 **Verdict**: Exclusion rate increases with company size — reaching 7.2% for large enterprises (10K+). This is above any "safe to ignore" threshold and represents a real commercial gap for Sales Intelligence.
 
@@ -129,21 +130,20 @@ Top 5 Tier A states by record count: California (619K), Texas (351K), New York (
 
 At 4.16M records, a full LLM pass is not feasible within the $10 budget. The agentic audit (Part 2) and enrichment PoC (Part 4) both require a statistically defensible sample that mirrors the real distribution.
 
-### Part 2 Audit Sample (~3,500 records)
+### Part 2 Audit Sample (n=100 per gap, 5 gaps → 496 records)
 
-Proportional stratified random sample across Tier A and Tier B states, weighting by record count within each state. Tier C excluded (record counts too thin for statistical conclusions).
+Part 2 ran a **semantic record-quality audit** across the top 5 gap sectors identified by Part 1.6, not a broad state-stratified sample. Each gap sector received 100 records drawn from states where that sector's coverage ratio was lowest, for a total of 496 records audited (slight shortfall from 500 due to state availability in two gaps).
 
-| State Tier | States | Records per State | Total |
-|---|---|---|---|
-| Tier A | 23 | ~100 | ~2,300 |
-| Tier B | 25 | ~50 | ~1,250 |
-| **Total** | **48** | — | **~3,550** |
+| Gap Sector | NAICS | Records Audited |
+|---|---|---|
+| rank_1 — Transportation & Warehousing | 48-49 | 99 |
+| rank_2 — Construction | 23 | 98 |
+| rank_3 — Retail Trade | 44-45 | 99 |
+| rank_4 — Size-dimension enrichment | (cross-cut) | 100 |
+| rank_5 — Transportation & Warehousing (secondary) | 48-49 | 100 |
+| **Total** | | **496** |
 
-Within each state, records are stratified by **industry sector** (proportional to state distribution) and **size band** (to ensure enterprise records are not diluted — see over-sampling note below). This produces `data/processed/part1_sample_audit.parquet`.
-
-**Per-state sample size rationale**: At 95% confidence, n=100 per Tier A state yields ±9.8% margin of error; n=50 per Tier B yields ±13.9% — consistent with the "directional" label applied to Tier B throughout this document. Both are sufficient to detect a 20-percentage-point gap (the structural-gap floor) with confidence; Tier B findings should not be treated as conclusive without corroboration from the SUSB comparator.
-
-**Enterprise over-sampling**: Because 500+ employee records are only 1.65% of the dataset, naive proportional sampling would yield ~58 enterprise records across 3,550 — too thin for gap analysis. The audit sample targets a minimum of **50 enterprise records per Tier A state** and **20 per Tier B state**, drawn first before filling remaining quota proportionally. This ensures enterprise coverage gaps surface as first-class findings rather than statistical noise.
+**Why 100/gap instead of ~3,500**: A state-stratified sample of 3,500 would cost ~$14 at Haiku rates — over the entire $10 project ceiling. The audit goal was qualitative pattern detection (mislabels, bad URLs, platform URLs missed), not distributional precision by state. At an observed issue rate of ~31% in the first gap (31/99 records flagged), n=100 gives more than sufficient power to characterise systematic error types. State-level stratification would matter for estimating *prevalence* by state, which is a Part 4 enrichment concern, not a gap-detection concern.
 
 **Verifier spot-check sample size (n=15 per gap)** — derivation: We want a sample large enough that, if a claimed gap is real at prevalence p ≥ 0.20 within the gap's slice, we will observe at least one positive case with high probability. Under a binomial model:
 
@@ -188,10 +188,12 @@ Script: `src/part1_sampling.py` → `data/processed/part1_sample_audit.parquet`.
 | size | 95.49% | ~188K | Medium |
 | industry | 91.81% | ~341K | **High** |
 | website | 78.17% | **~910K** | **Critical** |
-| type | 54.90% | ~1.88M | Low |
+| type | 54.90% | ~1.88M | Medium† |
 | founded | 45.90% | ~2.25M | Low |
 
-**Key finding**: `website` is the biggest gap (~910K missing). `industry` is the second largest actionable gap (~341K missing). `type` and `founded` are both majority-missing but have low commercial value for Sales Intelligence — not priority enrichment targets.
+**Key finding**: `website` is the biggest gap (~910K missing). `industry` is the second largest actionable gap (~341K missing). `founded` is majority-missing but low commercial priority — secondary signal, harder to recover. `type` is split: the public-company sub-case is **High** priority (deterministic SEC/ticker lookup, no model call, ICE 63, Rank 3 in Part 3); the private/unknown sub-case is Low (requires LLM inference, ICE 16).
+
+_† `type` priority split per Part 3 ICE analysis: public companies = High (Ease 9, SEC EDGAR); private/unknown = Low (Ease 4, LLM inference)._
 
 **Reconciling three `website` missing counts cited in this document:**
 - **908,883** (Section 11.2): raw SQL count of `website IS NULL` on the valid-state US population (4,164,063 records). Authoritative "raw NULL" figure.
@@ -864,6 +866,8 @@ Top 5 examples:
 | B (10K–49,999) | 634,208 | 24.00% | 9.20% | 5.18% | 50.50% |
 | C (<10K) | 25,296 | 27.81% | 9.67% | 4.74% | 61.43% |
 
+_Note: Tier C row covers the 3 Tier C US states (Alaska, South Dakota, North Dakota = 25,296 records), excluding the 289 territory records (Puerto Rico, Guam, etc.) which are also <10K but outside the 50-state+DC scope used here._
+
 #### Null rates by size band (website and industry)
 
 | Size Band | Records | website null % | industry null % |
@@ -967,7 +971,7 @@ Top 5 examples:
 
 #### 11.4b High Special Character Ratio (>30% non-alphanumeric excluding spaces)
 
-**Count: 4,006 US records** (0.096% of US records)
+**Count: 4,006 US records** (0.096% of US records) — _reproduced as ~2,851 with `re.sub(r'[a-zA-Z0-9 ]', '', name)`; the 4,006 figure reflects a broader character-class definition in the original profiling script (treating digits as non-"plain" characters). Both counts support the same conclusion: this cohort is <0.1% of records._
 
 Top 5 examples (mixed Latin + special chars):
 

@@ -123,7 +123,7 @@ Target: 2-3 hrs | Budget: $3
 **Separation of roles is the point here** — the brief explicitly tests trust calibration. The deterministic gap list already exists from Part 1.6; Part 2 is purely LLM judgment and spot-checks on top of it.
 
 - **Input**: `data/processed/part2_gap_candidates.json` (from Part 1.6). Do not re-derive gaps from SUSB — that work is done.
-- **data-engineer subagent**: for each gap candidate, uses LLM to add commercial reasoning, assess whether the gap is a sourcing gap vs. enrichment opportunity, and assign a confidence score. Annotates `part2_gap_candidates.json` in-place (adds `reasoning`, `gap_type`, `confidence` fields).
+- **data-engineer subagent**: for each of the top 5 gap sectors, draws 100 records from low-coverage states and runs a semantic record-quality audit (mislabels, bad URLs, platform URLs missed). Output: `data/processed/part2_audit_raw.json` (496 records total; slight shortfall from 500 due to state availability). Also produces gap synthesis with Haiku ranking + Sonnet narrative.
 - **verifier subagent**: independently spot-checks 15 records per candidate gap against raw data. Produces `docs/part2-audit.md`.
 - Every model call logged to `data/processed/shared_observability.jsonl` (prompt_version, model, latency, cost, outcome). This is the submission's trace artifact.
 - `gap_findings.md` must contain, per gap: what's missing, prevalence, confidence, "agent claimed X / spot-check found Y" — even when they agree. Silent agreement suppresses a useful signal.
