@@ -604,13 +604,13 @@ def stage1_search(client: anthropic.Anthropic, record: dict, obs: ObservabilityL
         )
         usage = response.usage
         cost = compute_cost(usage.input_tokens, usage.output_tokens, HAIKU_MODEL)
+        text = get_text(response)
         obs.log_call(
             phase="part_4", model=HAIKU_MODEL,
             tokens=usage.input_tokens + usage.output_tokens, cost=cost,
             prompt_version="stage1_search_v1", outcome="success",
-            metadata={"handle": record["handle"], "stage": 1},
+            metadata={"handle": record["handle"], "stage": 1, "raw_response": text},
         )
-        text = get_text(response)
         result = extract_json(text)
         result["_stage"] = 1
         result["_search_used"] = True
@@ -638,13 +638,13 @@ def stage1b_parametric(client: anthropic.Anthropic, record: dict, obs: Observabi
         )
         usage = response.usage
         cost = compute_cost(usage.input_tokens, usage.output_tokens, HAIKU_MODEL)
+        text = get_text(response)
         obs.log_call(
             phase="part_4", model=HAIKU_MODEL,
             tokens=usage.input_tokens + usage.output_tokens, cost=cost,
             prompt_version="stage1b_parametric_v1", outcome="success",
-            metadata={"handle": record["handle"], "stage": "1b"},
+            metadata={"handle": record["handle"], "stage": "1b", "raw_response": text},
         )
-        text = get_text(response)
         result = extract_json(text)
         result["_stage"] = "1b"
         result["_search_used"] = False
@@ -669,13 +669,13 @@ def stage3_verify(client: anthropic.Anthropic, record: dict, candidate_website: 
         )
         usage = response.usage
         cost = compute_cost(usage.input_tokens, usage.output_tokens, HAIKU_MODEL)
+        text = get_text(response)
         obs.log_call(
             phase="part_4", model=HAIKU_MODEL,
             tokens=usage.input_tokens + usage.output_tokens, cost=cost,
             prompt_version="stage3_verify_v1", outcome="success",
-            metadata={"handle": record["handle"], "stage": 3},
+            metadata={"handle": record["handle"], "stage": 3, "raw_response": text},
         )
-        text = get_text(response)
         result = extract_json(text)
         result["_stage"] = 3
         return result
@@ -696,14 +696,14 @@ def stage4_resolve(client: anthropic.Anthropic, record: dict, stage1_result: dic
         )
         usage = response.usage
         cost = compute_cost(usage.input_tokens, usage.output_tokens, SONNET_MODEL)
+        text = get_text(response)
         obs.log_call(
             phase="part_4", model=SONNET_MODEL,
             tokens=usage.input_tokens + usage.output_tokens, cost=cost,
             prompt_version="stage4_resolve_v1", outcome="success",
             metadata={"handle": record["handle"], "stage": 4,
-                      "uncertain_fields": uncertain_fields},
+                      "uncertain_fields": uncertain_fields, "raw_response": text},
         )
-        text = get_text(response)
         result = extract_json(text)
         result["_stage"] = 4
         return result
