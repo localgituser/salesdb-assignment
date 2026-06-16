@@ -1,1 +1,256 @@
-[]
+[
+  {
+    "handle": "company/avera-mckennan-hospital",
+    "name": "AVERA MCKENNAN HOSPITAL",
+    "segment": "enterprise",
+    "poc_condition": "missing_website",
+    "ground_truth": {
+      "website": "averamckennan.org",
+      "type": "Nonprofit",
+      "industry": "hospitals and health care",
+      "size": "1K-5K"
+    },
+    "notes": "Avera McKennan Hospital & University Health Center, Sioux Falls SD. Part of the Avera Health system."
+  },
+  {
+    "handle": "company/brownsville-isd",
+    "name": "BROWNSVILLE ISD",
+    "segment": "enterprise",
+    "poc_condition": "missing_website",
+    "ground_truth": {
+      "website": "bisd.us",
+      "type": "Government Agency",
+      "industry": "primary and secondary education",
+      "size": "5K-10K"
+    },
+    "notes": "Brownsville Independent School District, Texas. Large urban ISD."
+  },
+  {
+    "handle": "company/stolt-nielsen-usa-inc",
+    "name": "STOLT-NIELSEN USA INC",
+    "segment": "enterprise",
+    "poc_condition": "missing_website",
+    "ground_truth": {
+      "website": "stolt-nielsen.com",
+      "type": "Public Company",
+      "industry": "maritime transportation",
+      "size": "501-1K"
+    },
+    "notes": "US subsidiary of Stolt-Nielsen Limited (Oslo Stock Exchange listed), bulk liquid tanker and logistics company."
+  },
+  {
+    "handle": "company/faegre-baker-daniels-llp",
+    "name": "Faegre Baker Daniels LLP",
+    "segment": "enterprise",
+    "poc_condition": "missing_website",
+    "ground_truth": {
+      "website": "faegredrinker.com",
+      "type": "Partnership",
+      "industry": "law practice",
+      "size": "1K-5K"
+    },
+    "notes": "Merged with Drinker Biddle & Reath LLP in 2020 to become Faegre Drinker Biddle & Reath LLP. Website redirects to faegredrinker.com."
+  },
+  {
+    "handle": "company/alpine-access",
+    "name": "Alpine Access",
+    "segment": "enterprise",
+    "poc_condition": "missing_website",
+    "ground_truth": {
+      "website": null,
+      "type": "Privately Held",
+      "industry": "outsourcing and offshoring consulting",
+      "size": "1K-5K"
+    },
+    "notes": "Alpine Access was acquired by SYNNEX (later Concentrix) around 2012. No longer exists as independent entity; website gone."
+  },
+  {
+    "handle": "company/national-labor-relations-board",
+    "name": "National Labor Relations Board",
+    "segment": "enterprise",
+    "poc_condition": "platform_url",
+    "ground_truth": {
+      "website": "nlrb.gov",
+      "type": "Government Agency",
+      "industry": "government administration",
+      "size": "1K-5K"
+    },
+    "notes": "Federal independent agency. nlrb.gov is the correct official website — stored value is correct."
+  },
+  {
+    "handle": "company/oregon-department-of-corrections",
+    "name": "Oregon Department of Corrections",
+    "segment": "enterprise",
+    "poc_condition": "platform_url",
+    "ground_truth": {
+      "website": "oregon.gov/doc",
+      "type": "Government Agency",
+      "industry": "public safety",
+      "size": "1K-5K"
+    },
+    "notes": "Stored value is oregon.gov (parent domain). Correct URL is oregon.gov/doc."
+  },
+  {
+    "handle": "company/one-more-startup-in-stealth-mode",
+    "name": "Startup (in Stealth Mode)",
+    "segment": "enterprise",
+    "poc_condition": "platform_url",
+    "ground_truth": {
+      "website": null,
+      "type": "Self-Employed",
+      "industry": "it services and it consulting"
+    },
+    "notes": "Stealth-mode startup with LinkedIn as stored website. No public website exists. Size of 5K-10K is suspicious for a stealth startup — ground truth omits size as unreliable."
+  },
+  {
+    "handle": "company/whatabrands-llc",
+    "name": "WHATABRANDS LLC",
+    "segment": "enterprise",
+    "poc_condition": "missing_industry",
+    "ground_truth": {
+      "website": "whatabrands.com",
+      "type": "Privately Held",
+      "industry": "restaurants",
+      "size": "5K-10K"
+    },
+    "notes": "Whatabrands LLC is the parent holding company of Whataburger. San Antonio TX."
+  },
+  {
+    "handle": "company/boeing-commercial-space-company",
+    "name": "BOEING COMMERCIAL SPACE COMPANY",
+    "segment": "enterprise",
+    "poc_condition": "missing_industry",
+    "ground_truth": {
+      "website": "boeing.com",
+      "type": "Public Company",
+      "industry": "aviation and aerospace component manufacturing"
+    },
+    "notes": "Division of Boeing focused on commercial satellite launch. Website rolls up to boeing.com. Size of 501-1K refers to this division only."
+  },
+  {
+    "handle": "company/north-haven-school-district",
+    "name": "NORTH HAVEN SCHOOL DISTRICT",
+    "segment": "enterprise",
+    "poc_condition": "missing_industry",
+    "ground_truth": {
+      "website": "north-haven.k12.ct.us",
+      "type": "Government Agency",
+      "industry": "primary and secondary education",
+      "size": "501-1K"
+    },
+    "notes": "Connecticut school district. Website already in database — pipeline should confirm it."
+  },
+  {
+    "handle": "company/car-source-collision-center",
+    "name": "Car Source Collision Center",
+    "segment": "enterprise",
+    "poc_condition": "missing_industry",
+    "ground_truth": {
+      "website": "carsourcecollisioncenter.com",
+      "type": "Privately Held",
+      "industry": "vehicle repair and maintenance",
+      "size": "1K-5K"
+    },
+    "notes": "Auto body/collision repair shop in Gaithersburg MD. Website already in database."
+  },
+  {
+    "handle": "company/barbounia-restaurant-nyc",
+    "name": "Barbounia Restaurant NYC",
+    "segment": "mid_market",
+    "poc_condition": "missing_website",
+    "ground_truth": {
+      "website": "barbounia.com",
+      "type": "Privately Held",
+      "industry": "restaurants",
+      "size": "51-200"
+    },
+    "notes": "Mediterranean restaurant at 250 Park Ave South, Manhattan."
+  },
+  {
+    "handle": "company/hays-consolidated-i-s-d",
+    "name": "HAYS CONSOLIDATED I S D",
+    "segment": "mid_market",
+    "poc_condition": "missing_website",
+    "ground_truth": {
+      "website": "hayscisd.net",
+      "type": "Government Agency",
+      "industry": "primary and secondary education"
+    },
+    "notes": "Hays Consolidated ISD, Kyle TX. Size in DB (51-200) is almost certainly wrong for this ISD — omitting size from ground truth."
+  },
+  {
+    "handle": "company/mercy-hospital-cadillac",
+    "name": "MERCY HOSPITAL CADILLAC",
+    "segment": "mid_market",
+    "poc_condition": "missing_website",
+    "ground_truth": {
+      "type": "Nonprofit",
+      "industry": "hospitals and health care",
+      "size": "201-500"
+    },
+    "notes": "Part of Trinity Health system. Website uncertain (may have closed or merged URL). Omitting website from ground truth."
+  },
+  {
+    "handle": "company/governor-shapiro",
+    "name": "Office of Governor Josh Shapiro",
+    "segment": "mid_market",
+    "poc_condition": "platform_url",
+    "ground_truth": {
+      "website": "governor.pa.gov",
+      "type": "Government Agency",
+      "industry": "government administration",
+      "size": "201-500"
+    },
+    "notes": "Stored value is pa.gov (parent domain). Correct URL is governor.pa.gov."
+  },
+  {
+    "handle": "company/hoboken-hospitality",
+    "name": "Hoboken Hospitality",
+    "segment": "mid_market",
+    "poc_condition": "platform_url",
+    "ground_truth": {
+      "type": "Privately Held",
+      "industry": "hospitality"
+    },
+    "notes": "Stored value is facebook.com. Actual website unknown — omitting from ground truth. Segment and industry are classifiable from name."
+  },
+  {
+    "handle": "company/clientele-inc.",
+    "name": "CLIENTELE, INC.",
+    "segment": "mid_market",
+    "poc_condition": "missing_industry",
+    "ground_truth": {
+      "website": "clientelebeauty.com",
+      "type": "Privately Held",
+      "industry": "personal care product manufacturing",
+      "size": "51-200"
+    },
+    "notes": "Clientele is a US skincare brand. Website already in database."
+  },
+  {
+    "handle": "company/kass-shuler-p.a.",
+    "name": "KASS SHULER, P.A.",
+    "segment": "mid_market",
+    "poc_condition": "missing_industry",
+    "ground_truth": {
+      "website": "kassshuler.com",
+      "type": "Partnership",
+      "industry": "law practice",
+      "size": "201-500"
+    },
+    "notes": "Florida law firm specializing in civil/family litigation. Website already in database."
+  },
+  {
+    "handle": "company/willamette-esd-school-district",
+    "name": "WILLAMETTE ESD SCHOOL DISTRICT",
+    "segment": "mid_market",
+    "poc_condition": "missing_website",
+    "ground_truth": {
+      "website": "wesd.k12.or.us",
+      "type": "Government Agency",
+      "industry": "primary and secondary education",
+      "size": "201-500"
+    },
+    "notes": "Willamette Education Service District, Salem OR. Regional ESD serving multiple school districts."
+  }
+]

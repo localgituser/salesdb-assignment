@@ -1,0 +1,284 @@
+{
+  "summary": {
+    "ground_truth_records": 20,
+    "enriched_records_matched": 20,
+    "unmatched_handles": [],
+    "macro_precision": 0.656,
+    "macro_recall": 0.656,
+    "macro_f1": 0.656
+  },
+  "per_field": {
+    "website": {
+      "tp": 12,
+      "fp": 4,
+      "fn": 4,
+      "precision": 0.75,
+      "recall": 0.75,
+      "f1": 0.75
+    },
+    "type": {
+      "tp": 18,
+      "fp": 2,
+      "fn": 2,
+      "precision": 0.9,
+      "recall": 0.9,
+      "f1": 0.9
+    },
+    "industry": {
+      "tp": 12,
+      "fp": 8,
+      "fn": 8,
+      "precision": 0.6,
+      "recall": 0.6,
+      "f1": 0.6
+    },
+    "size": {
+      "tp": 6,
+      "fp": 10,
+      "fn": 10,
+      "precision": 0.375,
+      "recall": 0.375,
+      "f1": 0.375
+    }
+  },
+  "per_segment": {
+    "enterprise": {
+      "website": {
+        "tp": 8,
+        "fp": 2,
+        "fn": 2,
+        "precision": 0.8,
+        "recall": 0.8,
+        "f1": 0.8
+      },
+      "type": {
+        "tp": 10,
+        "fp": 2,
+        "fn": 2,
+        "precision": 0.833,
+        "recall": 0.833,
+        "f1": 0.833
+      },
+      "industry": {
+        "tp": 7,
+        "fp": 5,
+        "fn": 5,
+        "precision": 0.583,
+        "recall": 0.583,
+        "f1": 0.583
+      },
+      "size": {
+        "tp": 4,
+        "fp": 6,
+        "fn": 6,
+        "precision": 0.4,
+        "recall": 0.4,
+        "f1": 0.4
+      }
+    },
+    "mid_market": {
+      "website": {
+        "tp": 4,
+        "fp": 2,
+        "fn": 2,
+        "precision": 0.667,
+        "recall": 0.667,
+        "f1": 0.667
+      },
+      "type": {
+        "tp": 8,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0
+      },
+      "industry": {
+        "tp": 5,
+        "fp": 3,
+        "fn": 3,
+        "precision": 0.625,
+        "recall": 0.625,
+        "f1": 0.625
+      },
+      "size": {
+        "tp": 2,
+        "fp": 4,
+        "fn": 4,
+        "precision": 0.333,
+        "recall": 0.333,
+        "f1": 0.333
+      }
+    }
+  },
+  "mismatches": [
+    {
+      "handle": "company/avera-mckennan-hospital",
+      "field": "website",
+      "gt": "averamckennan.org",
+      "pred": "avera.org",
+      "segment": "enterprise"
+    },
+    {
+      "handle": "company/avera-mckennan-hospital",
+      "field": "size",
+      "gt": "1K-5K",
+      "pred": "10K+",
+      "segment": "enterprise"
+    },
+    {
+      "handle": "company/brownsville-isd",
+      "field": "industry",
+      "gt": "primary and secondary education",
+      "pred": "higher education",
+      "segment": "enterprise"
+    },
+    {
+      "handle": "company/stolt-nielsen-usa-inc",
+      "field": "type",
+      "gt": "Public Company",
+      "pred": "Privately Held",
+      "segment": "enterprise"
+    },
+    {
+      "handle": "company/stolt-nielsen-usa-inc",
+      "field": "size",
+      "gt": "501-1K",
+      "pred": "201-500",
+      "segment": "enterprise"
+    },
+    {
+      "handle": "company/faegre-baker-daniels-llp",
+      "field": "size",
+      "gt": "1K-5K",
+      "pred": "501-1K",
+      "segment": "enterprise"
+    },
+    {
+      "handle": "company/alpine-access",
+      "field": "industry",
+      "gt": "outsourcing and offshoring consulting",
+      "pred": "business consulting and services",
+      "segment": "enterprise"
+    },
+    {
+      "handle": "company/alpine-access",
+      "field": "size",
+      "gt": "1K-5K",
+      "pred": "501-1K",
+      "segment": "enterprise"
+    },
+    {
+      "handle": "company/national-labor-relations-board",
+      "field": "industry",
+      "gt": "government administration",
+      "pred": "government relations",
+      "segment": "enterprise"
+    },
+    {
+      "handle": "company/national-labor-relations-board",
+      "field": "size",
+      "gt": "1K-5K",
+      "pred": "501-1K",
+      "segment": "enterprise"
+    },
+    {
+      "handle": "company/one-more-startup-in-stealth-mode",
+      "field": "type",
+      "gt": "Self-Employed",
+      "pred": "Privately Held",
+      "segment": "enterprise"
+    },
+    {
+      "handle": "company/boeing-commercial-space-company",
+      "field": "website",
+      "gt": "boeing.com",
+      "pred": null,
+      "segment": "enterprise"
+    },
+    {
+      "handle": "company/boeing-commercial-space-company",
+      "field": "industry",
+      "gt": "aviation and aerospace component manufacturing",
+      "pred": "defense and space manufacturing",
+      "segment": "enterprise"
+    },
+    {
+      "handle": "company/north-haven-school-district",
+      "field": "industry",
+      "gt": "primary and secondary education",
+      "pred": "higher education",
+      "segment": "enterprise"
+    },
+    {
+      "handle": "company/car-source-collision-center",
+      "field": "size",
+      "gt": "1K-5K",
+      "pred": "11-50",
+      "segment": "enterprise"
+    },
+    {
+      "handle": "company/barbounia-restaurant-nyc",
+      "field": "size",
+      "gt": "51-200",
+      "pred": "11-50",
+      "segment": "mid_market"
+    },
+    {
+      "handle": "company/mercy-hospital-cadillac",
+      "field": "size",
+      "gt": "201-500",
+      "pred": "51-200",
+      "segment": "mid_market"
+    },
+    {
+      "handle": "company/governor-shapiro",
+      "field": "website",
+      "gt": "governor.pa.gov",
+      "pred": "pa.gov",
+      "segment": "mid_market"
+    },
+    {
+      "handle": "company/governor-shapiro",
+      "field": "size",
+      "gt": "201-500",
+      "pred": "1K-5K",
+      "segment": "mid_market"
+    },
+    {
+      "handle": "company/hoboken-hospitality",
+      "field": "industry",
+      "gt": "hospitality",
+      "pred": "restaurants",
+      "segment": "mid_market"
+    },
+    {
+      "handle": "company/kass-shuler-p.a.",
+      "field": "industry",
+      "gt": "law practice",
+      "pred": "legal services",
+      "segment": "mid_market"
+    },
+    {
+      "handle": "company/kass-shuler-p.a.",
+      "field": "size",
+      "gt": "201-500",
+      "pred": "51-200",
+      "segment": "mid_market"
+    },
+    {
+      "handle": "company/willamette-esd-school-district",
+      "field": "website",
+      "gt": "wesd.k12.or.us",
+      "pred": "wesd.org",
+      "segment": "mid_market"
+    },
+    {
+      "handle": "company/willamette-esd-school-district",
+      "field": "industry",
+      "gt": "primary and secondary education",
+      "pred": "advertising services",
+      "segment": "mid_market"
+    }
+  ]
+}
