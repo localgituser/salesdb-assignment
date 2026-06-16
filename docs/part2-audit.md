@@ -242,6 +242,42 @@ Sampled from top-5 gap sectors, stratified by state (10 worst-covered Tier A + 5
 
 ---
 
+## Manual Audit Observations
+
+These observations were made during manual spot-checking of sampled records and Google search verification. They are independent of the agent and Haiku passes above — human eyes on the raw data.
+
+### Observation A — Website field corruption: private US businesses assigned foreign government domains
+
+Manual inspection of individual records found private US businesses with completely unrelated foreign government URLs stored as their `website` value:
+
+| Entity | Stored website | What that URL actually is |
+|---|---|---|
+| Better Health Massage Therapy | `betterhealth.vic.gov.au` | Victorian state government health portal, Australia |
+| Aerobics Plus (Endicott, NY) | `wirral.gov.uk` | Wirral Council, a UK local government site |
+
+This is not the expected institutional-entity case (a .gov agency storing its own domain). These are private US businesses — a massage therapy practice and a fitness studio — with entirely unrelated foreign government domains assigned to them. The most likely explanation is a scrape or ingestion artefact where a web crawler resolved a government health directory page that referenced the business, then stored the directory's domain rather than the business's own URL.
+
+**Rules gap**: The `INSTITUTIONAL_TLDS` check in `src/shared/rules.py` matches only `.gov` (US federal suffix). `betterhealth.vic.gov.au` ends in `.gov.au` and `wirral.gov.uk` ends in `.gov.uk` — both pass through the rules stage uncaught and are counted as "has a website" in the 80.56% fill rate figure. The full population of such country-code government domain corruptions is unknown.
+
+**Implication for enrichment priority**: The 291,896 records identified as the website enrichment gap (Part 3, Gap 1) is a lower bound. An additional, unknown number of records in the "populated" 80.56% carry corrupted domains that the current blocklist and institutional-TLD check do not catch. Field reliability for the populated population cannot be assumed — this is a precision risk, not just a coverage risk, and it reinforces the Precision-First Policy in Part 3 §3.
+
+---
+
+### Observation B — Small business records: broadly unreliable, low online presence confirmed by Google search
+
+Manual Google searches on a sample of small business records (1–50 employees) across multiple sectors found a significant share where:
+
+- The named business returns **no Google search results** at all
+- The business appears only as a **Google Maps listing** with no associated website
+- The business appears **under a different name**, suggesting a rebrand or acquisition not reflected in the record
+- The business **appears to have closed**, with no current web presence
+
+This is directionally consistent with the agent's Gap 5 finding (micro trucking at 58.1% website fill, micro restaurants at 56.7%) but the manual search goes further: it is not just an enrichment gap where a website exists but wasn't sourced. A material fraction of small business records in the 1–50 employee band appear to refer to entities that are effectively offline, defunct, or unidentifiable by name — not simply unenriched.
+
+**Implication**: This observation further validates the Part 3 Scope Assumption (micro-business exclusion from enrichment). Running the website enrichment cascade against micro and small business records at scale risks populating stale, wrong, or irrelevant URLs at high volume — producing an enriched file that looks more complete but is less trustworthy. It also reinforces Gap 5's "low or no web presence" root cause: for a significant share of these records, a website to find does not exist.
+
+---
+
 ## Trust Calibration Note
 
 The data-engineer (Haiku + Sonnet) produced sector rankings and gap narratives from pre-aggregated statistics in `part2_gap_candidates.json`. The verifier independently re-derived each top-5 finding from raw `part0_companies_clean.parquet` via SQL (n=15 per gap). Verdicts above reflect the verifier's independent assessment.
