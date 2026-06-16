@@ -25,6 +25,18 @@ GROUND_TRUTH_PATH = ROOT / "evals/ground_truth.json"
 ENRICHED_PATH = ROOT / "data/enriched/part4_enriched_sample.parquet"
 FIELDS = ["website", "type", "industry", "size"]
 
+SIZE_BANDS = ["1-10", "11-50", "51-200", "201-500", "501-1K", "1K-5K", "5K-10K", "10K+"]
+
+
+def size_band_distance(a: Optional[str], b: Optional[str]) -> Optional[int]:
+    """Ordinal distance between two size bands. None if either is not in the enum."""
+    if a is None or b is None:
+        return None
+    try:
+        return abs(SIZE_BANDS.index(a) - SIZE_BANDS.index(b))
+    except ValueError:
+        return None
+
 
 def normalize_domain(url: Optional[str]) -> Optional[str]:
     """Normalize URL to bare domain for comparison."""
@@ -87,6 +99,10 @@ def run_eval() -> dict:
     }
     # Per-segment counters
     seg_counters: dict[str, dict[str, dict[str, int]]] = {}
+    # Ordinal size tracking: within-1-band counts as near-correct
+    size_within_one: int = 0
+    size_total_mismatches: int = 0
+    size_band_distances: list[int] = []
 
     matched = 0
     unmatched_handles = []
@@ -133,11 +149,19 @@ def run_eval() -> dict:
                 counters[field]["fn"] += 1
                 seg_counters[segment][field]["fp"] += 1
                 seg_counters[segment][field]["fn"] += 1
+                dist = size_band_distance(gt_values[field], pred.get(f"{field}_final")) if field == "size" else None
                 mismatches.append({
                     "handle": handle, "field": field,
                     "gt": gt_values[field], "pred": pred.get(f"{field}_final"),
                     "segment": segment,
+                    **({"band_distance": dist} if dist is not None else {}),
                 })
+                if field == "size" and gt_val is not None and pred_val is not None:
+                    size_total_mismatches += 1
+                    if dist is not None:
+                        size_band_distances.append(dist)
+                        if dist <= 1:
+                            size_within_one += 1
 
     # Build results
     field_metrics = {f: compute_metrics(**counters[f]) for f in FIELDS}
@@ -156,6 +180,8 @@ def run_eval() -> dict:
     else:
         macro_f1 = None
 
+    avg_band_dist = round(sum(size_band_distances) / len(size_band_distances), 2) if size_band_distances else None
+
     results = {
         "summary": {
             "ground_truth_records": len(ground_truth),
@@ -167,6 +193,12 @@ def run_eval() -> dict:
         },
         "per_field": field_metrics,
         "per_segment": seg_metrics,
+        "size_ordinal": {
+            "total_mismatches": size_total_mismatches,
+            "within_one_band": size_within_one,
+            "within_one_band_rate": round(size_within_one / size_total_mismatches, 3) if size_total_mismatches else None,
+            "avg_band_distance": avg_band_dist,
+        },
         "mismatches": mismatches,
     }
 
@@ -201,6 +233,15 @@ def print_report(results: dict) -> None:
           f"{str(s['macro_recall']):>10} "
           f"{str(s['macro_f1']):>8}")
     print()
+
+    # Size ordinal breakdown
+    so = results.get("size_ordinal", {})
+    if so.get("total_mismatches"):
+        print(f"Size ordinal (exact-match F1 understates accuracy):")
+        print(f"  Mismatches within 1 band: {so['within_one_band']}/{so['total_mismatches']} "
+              f"({so.get('within_one_band_rate', 0):.0%})")
+        print(f"  Avg band distance on mismatches: {so.get('avg_band_distance', 'N/A')}")
+        print()
 
     # Per-segment
     if results["per_segment"]:

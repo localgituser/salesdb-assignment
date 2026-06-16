@@ -298,9 +298,11 @@ _KEYWORD_MAP: list[tuple[frozenset, str]] = [
     (frozenset(["hospital", "hospitals"]), "hospitals and health care"),
     (frozenset(["restaurant", "restaurants", "dining", "eatery"]), "restaurants"),
     (frozenset(["maritime", "shipping", "tanker", "bulk", "liquid"]), "maritime transportation"),
-    (frozenset(["law", "attorney", "lawyers", "litigation"]), "law practice"),
+    (frozenset(["law", "attorney", "attorneys", "lawyers", "litigation", "llp", "p.a."]), "law practice"),
     (frozenset(["legal"]), "legal services"),
-    (frozenset(["school", "elementary", "secondary", "k-12", "k12", "isd"]), "primary and secondary education"),
+    # "district" + any school keyword → K-12, not higher education
+    (frozenset(["district", "isd", "k-12", "k12", "elementary", "secondary"]), "primary and secondary education"),
+    (frozenset(["school"]), "primary and secondary education"),
     (frozenset(["vehicle", "auto", "automobile", "body", "repair"]), "vehicle repair and maintenance"),
     (frozenset(["defense", "missile", "munitions"]), "defense and space manufacturing"),
     (frozenset(["aerospace", "space", "satellite", "rocket", "launch"]), "aviation and aerospace component manufacturing"),
@@ -442,6 +444,8 @@ Rules:
 - candidate_website: bare domain only (no https://, no www., no path). null if not found.
 - candidate_type must be exactly one of: {", ".join(TYPE_ENUM)}
 - candidate_size must be exactly one of: {", ".join(SIZE_ENUM)}
+  Size band employee ranges: 1-10, 11-50, 51-200, 201-500, 501-1K (501–1000), 1K-5K (1001–5000), 5K-10K (5001–10000), 10K+ (over 10000).
+  Use the company's own website headcount or recent news — do not guess from name alone.
 - industry_raw: 2-4 words describing the primary business. null if unclear.
 - Use null for any field you cannot determine confidently.
 - Confidence: 0.0 = no evidence, 1.0 = certain."""
@@ -496,6 +500,8 @@ Consider:
 1. Does the domain relate to the company name?
 2. Is it a direct company site (not a job board, social media, or directory)?
 3. Could this be a different company with a similar name in a different location?
+4. Is this a parent organization or umbrella brand rather than the specific company's own site?
+   (e.g. a hospital system's root domain instead of the specific hospital's subdomain/page)
 
 Return ONLY this JSON:
 {{
@@ -791,8 +797,11 @@ def enrich_record(record: dict, client: anthropic.Anthropic,
             uncertain_fields.append("website")
     if stage1_result.get("candidate_type") and final_t_conf < CONFIDENCE_ESCALATE_THRESHOLD:
         uncertain_fields.append("type")
+    # Only escalate size to Sonnet when we have a found website to reason against;
+    # without web evidence Sonnet can't do better than Haiku's parametric guess.
     if stage1_result.get("candidate_size") and final_s_conf < CONFIDENCE_ESCALATE_THRESHOLD:
-        uncertain_fields.append("size")
+        if candidate_website:
+            uncertain_fields.append("size")
     if stage1_result.get("industry_snapped") and final_i_conf < CONFIDENCE_ESCALATE_THRESHOLD:
         uncertain_fields.append("industry")
 
@@ -871,11 +880,11 @@ def _build_output(record: dict, stage0: dict, stage1: dict, stage3: dict, stage4
     industry_final = industry_enriched or (record.get("industry") if not _is_nan(record.get("industry")) else None)
     website_final = website_enriched or (website_original_domain if not stage0.get("website_rules_flag") else None)
 
-    # Determine enrichment_status
+    # Determine enrichment_status — only count fields that were actually missing and got filled.
     filled = sum([
         website_final is not None and _is_nan(website_original),
-        type_final is not None,
-        size_final is not None,
+        type_final is not None and _is_nan(stage0.get("type_original")),
+        size_final is not None and _is_nan(stage0.get("size_original")),
         industry_final is not None and _is_nan(record.get("industry")),
     ])
     if status == "error":
