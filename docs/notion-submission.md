@@ -1,8 +1,11 @@
 # US Market Coverage Audit & 90-Day Plan
 
 **Kunal Kalra · Regional Data Lead Assessment · June 2026**
+
 **Tools**: Claude Code (Sonnet 4.6 + Haiku 4.5), DuckDB, Pandas, Anthropic SDK
-**Repo**: [github.com/…] · **Budget spent**: $8.60 / $10.00 self-imposed ceiling
+**Repo**: [[github](https://github.com/localgituser/salesdb-assignment)] 
+**Loom**: [https://www.loom.com/share/9e813cdf76214c97bd8ede64da39ccd9]
+**Budget spent**: $8.60 / $10.00 self-imposed ceiling
 
 The brief asked for a working PoC over a polished deck. I built the pipeline first, wrote the plan second, and let the eval results shape both. The self-imposed $10 budget was a discipline constraint — it forced early decisions about where rules beat LLMs and where sampling beats exhaustive passes. Everything below is grounded in what the pipeline actually produced.
 
@@ -16,6 +19,12 @@ The BigPicture dataset gives Firmable a 4.16M-record US starting point. This pla
 
 The PoC showed that website (P=0.75) and industry (P=0.79) are already within striking distance of a shippable threshold. The 90-day plan is structured around closing that gap with a focused entity resolution spike, then validating with a design partner before scaling.
 
+PS: Firmable already has US data. This is a hypothetical scenario created for the purpose of this case study.
+
+### **Core Assumption**
+
+This plan was developed in isolation, without understanding Firmable’s current velocity or development stack. It should be reviewed by the team executing it to ensure it’s grounded in reality and not under- or over-estimating effort.
+
 ### Measurable outcomes
 
 | Metric | Baseline (PoC) | Day 90 target |
@@ -28,21 +37,23 @@ Size is explicitly excluded from day 90 targets — open web data has a structur
 
 ### Work plan
 
+Three swim lanes: **Eng-1** (data/infra), **Eng-2** (ML/enrichment), **Eng-3** (product-facing/partner).
+
 | Ticket | Size | Owner | Deps | Description |
 |---|---|---|---|---|
-| **T01 — Data cleanup** | XS | Data | — | Extend URL blocklist (GMB, e-commerce, URL shorteners); flag franchise domains; deduplicate 3 semantic industry label pairs across 4.16M records |
-| **T02 — State null recovery** | XS | Data | T01 | Deterministic join of 124K null-state records against USPS city→state reference. Unblocks 13K mid-market and enterprise (51+) records currently invisible in state-filtered searches. $0 model cost. |
-| **T03 — Entity resolution spike** | M | ML | T01/T02 | Root cause the 48% NO_CANDIDATE rate and parent-vs-subsidiary conflation. Run targeted test batch against known failure cases. Goal: website P ≥0.85. |
-| **T04 — Industry classification spike** | M | ML | T01 | Sibling-label confusion accounts for 5/5 industry eval mismatches. Test classification approaches. Goal: industry P ≥0.85. |
-| **T05 — Deterministic type enrichment** | S | Data | — | Name-suffix rules (school districts, government agencies) + SEC ticker lookups. Reduce Sonnet/Haiku type calls by ≥30% without dropping P below 0.94. |
-| **T06 — Low-signal exclusion** | XS | Data | T01 | Define and ship exclusion criteria for records with no resolvable public presence (stealth, placeholder, permanently closed). Spot-check before shipping. |
-| **T07 — Eval expansion** | M | QA | T03/T04 | Expand ground truth 20 → 100 records across enterprise, mid-market, SMB. Add confidence calibration check to eval runner. At 20 records one miss moves a segment metric 8% — not defensible for a ship decision. |
-| **T08 — Design partner validation** | S | Data+CS | T03/T04 | Route 50 enriched records to one ANZ customer with US territory. Three questions per record: website resolves? Right company? Would you use this in a sequence? |
+| **T01 — Data cleanup + blocklist** | XS | Eng-1 | — | URL blocklist extension (GMB, .gov.au/.gov.uk foreign domains, shorteners); dedup 3 semantic industry label pairs; USPS city→state join for 124K null-state records (unblocks 13K mid-market and enterprise records, $0 model cost). Ships day 3. |
+| **T02 — Schema mapping + ingest gate** | S | Eng-1 | T01 | Map BigPicture fields → Firmable canonical schema (enums, field names, nullability). Run cross-dataset entity match sample (BigPicture `handle` vs. Firmable's existing US entity graph) to size net-new vs. conflict population. Defines upsert strategy before any data touches production. Required before the 30K pilot has anywhere to land. |
+| **T03 — Entity resolution spike (agent-run)** | M | Eng-2 | T01 | Root-cause the 48% NO_CANDIDATE rate. Agent loop: sample 50 known-failure records, iterate prompt + search strategy, score automatically after each cycle — human reviews results, not mid-loop execution. All iterations logged to `shared_observability.jsonl`. Target: website P ≥0.85. |
+| **T04 — Industry classification spike (agent-run)** | M | Eng-2 | T01 | 5/5 industry eval mismatches are sibling-label confusion. Agent-driven classification test: feed the 20-record eval set through candidate prompt variants, score automatically, surface top-2 approaches for human sign-off. Target: industry P ≥0.85. |
+| **T05 — Deterministic type enrichment** | S | Eng-1 | — | Name-suffix rules (school districts, government agencies) + SEC ticker lookups. Reduces Haiku/Sonnet type calls by ≥30% without dropping P below 0.94. |
+| **T06 — Eval expansion + automated harness** | S | Eng-2 | T03/T04 | Expand ground truth 20 → 100 records (enterprise/mid-market/SMB/micro split). Wire `eval_runner.py` to run automatically on every enrichment batch and post results to the team channel. At 20 records one miss moves a segment metric 8% — not a ship decision. |
+| **T07 — Staging ingest + quality gate** | M | Eng-3 | T02/T06 | Write enriched batch to a staging table. Automated checks: null rate delta, enum coverage, confidence distribution, fill rate vs. baseline. Fail batch if any metric regresses >5pp. Promote to prod only on pass. Required before 30K pilot. |
+| **T08 — Design partner validation** | S | Eng-3 | T03/T04 | Route 50 enriched records to one ANZ customer with US territory. Three questions per record: website resolves? Right company? Would you use this in a sequence? ≥70% positive = Sprint 2 trigger. |
 
 ### Sequencing
 
 **Day 1–30 — Build & iterate**
-T01, T02, T05, T06 ship in week 1 (deterministic, $0 model cost). T03 and T04 are spikes — run, measure, iterate within the sprint. Re-run the 288-record eval batch at day 20 for an updated precision score before the gate.
+T01 and T05 ship in week 1 (deterministic, $0 model cost). T02 (schema mapping) runs in parallel — must complete before any pilot ingest. T03 and T04 are agent-run spikes with a human review gate every two days; agent logs all iterations, human reviews results. Re-run the 288-record eval batch at day 20 for an updated precision score before the gate.
 
 **Day 30 — Go / No-Go / Pivot**
 - **Go**: website P ≥0.78 AND industry P ≥0.78 → proceed to Sprint 2
@@ -50,16 +61,16 @@ T01, T02, T05, T06 ship in week 1 (deterministic, $0 model cost). T03 and T04 ar
 - **Kill / descope**: either metric below 0.70 → narrow to enterprise-only scope, diagnose root cause
 
 **Day 31–60 — Validate & expand**
-T07 (eval expansion) and T08 (design partner validation) run in parallel. Size spike runs if day-30 gate passes and capacity exists. Full-scale 30K pilot planned but not kicked off until design partner feedback clears.
+T06 (eval expansion + automated harness), T07 (staging ingest gate), and T08 (design partner validation) run in parallel. 30K pilot scoped but not kicked off until T07 passes and T08 returns ≥70% positive feedback.
 
 **Day 61–90 — Ship**
-30K pilot run if Sprint 2 gate passes (≥70% positive design partner feedback). Ingest into platform. Cycle 2 scoping begins: contact enrichment, `global_size` field, first-party size provider.
+30K pilot runs through T07 staging gate → production ingest. Cycle 2 scoping begins: contact enrichment, `global_size` field, first-party size provider.
 
 ### Risk and bet
 
-**Risk**: Size precision is structurally limited by public web data. If size doesn't clear 0.55 by day 30, gate it from customer output and communicate to CS before Sprint 2. The risk isn't a low score — it's shipping a low score silently. Size is excluded from day 90 targets because the PoC revealed systematic parent/subsidiary headcount conflation that can't be fixed with better prompting — it requires a first-party data source or explicit single-facility gating that isn't yet in place.
+**Risk**: Size precision is structurally broken — P=0.44 in the PoC, with 43% of predictions wrong at ≥0.80 confidence. A miscalibrated confidence score is worse than no score; it gives downstream consumers false certainty. Size stays gated from customer output until it clears P≥0.55 with a calibrated confidence floor. If it doesn't clear by day 30, communicate to CS before Sprint 2 and scope it to Cycle 2 with a first-party data source.
 
-**Bet**: If budget halves, protect T01–T04 and the 30K pilot. Website and industry are the primary ICP filter dimensions. A clean ingest with those two fields at P ≥0.85 — and size explicitly gated — is a credible first delivery. Size and contacts follow in cycle 2.
+**Bet**: If budget halves, protect T01, T03, T04, and T07. Website and industry are the primary ICP filter dimensions. A clean ingest at P≥0.85 on those two fields — with size explicitly gated and a staging gate preventing silent regression — is a credible first delivery. Contacts and size follow in Cycle 2.
 
 ---
 
@@ -126,24 +137,43 @@ Two findings surfaced during hands-on record inspection and Google search verifi
 
 ## Part 3 — Commercial Framing & Prioritisation
 
-**Goal**: Connect each gap to a deal Sales would win or a churn signal CS would prevent. Short, not comprehensive.
+**Goal**: Translate Part 2's sector gaps into a field-level fix sequence. One question per gap: *can we ship this data to a customer without fixing it?*
 
-**Framework**: MoSCoW — one question per gap: *can we ship this data to a customer without fixing it?*
+**Framework**: MoSCoW. Part 2 surfaced *where* coverage is thin (Construction 6%, Transportation 2%, Retail 6%). Part 3 reframes to *what to fix* — because the field dependency map determines sequencing more than sector priority does.
 
-| Gap | ICP / Persona | Deal impact | Churn signal | MoSCoW | Rationale |
-|---|---|---|---|---|---|
-| Construction | GC, sub-contractor, equipment finance AE | Sub-10% coverage in every state — no viable territory | CS can't run expansion playbooks; customer churns to Dodge Data or BuildZoom | **Must** | 48-state uniformity = sourcing miss with predictable yield; no NES inflation ceiling; selected for Part 4 PoC |
-| State null recovery | All AEs using state filters | 13K enterprise records invisible in state-filtered searches | Enrichment blocked for highest-value size band | **Must** | $0 deterministic fix; unblocks all downstream enrichment for 51+ records |
-| Transportation | Freight tech, fuel card, fleet service AE | Can't build a prospect list from current inventory | Outbound sequences fail; customer reports "bad data" | **Should** | FMCSA is a single federal API; high commercial signal — but NES inflation makes recoverable population harder to size than Construction |
-| Retail | POS, supply chain, staffing AE | Can't identify majority of retail SMB TAM | Quota attainment miss; AE escalates to CS | **Should** | Franchise disclosure + state licensing; moderate complexity; lower urgency than sector gaps with AE workflow blockers |
-| Micro website | Last-mile logistics, restaurant supply, hospitality staffing | Systematic deliverability gaps in outbound sequences | Low reply rates; customer blames data quality | **Could** | Alternative enrichment approach needed; Part 4 confirms many of these entities have no resolvable web presence — structural ceiling, not a sourcing miss |
-| Enterprise sourcing | ABM platform customer, enterprise AE | Not enough records to run an ABM campaign at scale | High-LTV segment disqualifies Firmable on TAM coverage | **Won't** | Sourcing infrastructure change, not a pipeline fix; Cycle 2 |
+**Field dependency map**:
+```
+Cleanup pre-pass (blocklist extension, semantic dedup)
+    └──> makes gap counts accurate; removes platform URL noise before enrichment runs
+
+State recovery (deterministic city→state join)
+    └──> unblocks website enrichment query precision (name + city + state vs. name + city only)
+
+Website enrichment  ← upstream blocker for everything below
+    └──> unlocks industry classification (homepage is the primary signal)
+    └──> unlocks email_domain ($0, rules-derivable)
+    └──> unlocks entity type inference for private/unknown
+```
+
+Website is the upstream blocker. Fixing Construction's sector gap without first fixing website fill rates means building on a distorted baseline. The enrichment cascade in Part 4 follows this map directly.
+
+| Gap | Records affected | Commercial impact | MoSCoW | Rationale |
+|---|---|---|---|---|
+| **Cleanup pre-pass** (blocklist extension, semantic dedup, franchise domain flagging) | ~3K+ reclassified; 329K industry labels deduped | Every downstream metric is wrong without it — gap counts, enrichment queue size, fill rates | **Must** | $0; ships day 1; prerequisite for accurate gap measurement |
+| **State null recovery** (deterministic city→state join) | 124K total / 13K enterprise | 13K enterprise records invisible in any state-filtered search; degrades website query precision for all enrichment | **Must** | $0 deterministic fix; no model calls |
+| **Website enrichment** | ~972K missing (true count post-cleanup) | Upstream blocker for all other enrichment. No website = no industry signal, no email domain, no type inference. Every customer is affected regardless of vertical or ICP | **Must** | Selected for Part 4 PoC |
+| **Industry enrichment** (genuinely null post-dedup) | 65K records | 65K records invisible in vertical ICP filters — the primary search dimension for Sales Intelligence | **Must** | Natural phase 2 of the same cascade as website |
+| **Type — public companies** (SEC/ticker lookup) | ~40K | Deterministic, free, near-perfect precision. Closes a visible gap for ABM and securities-linked workflows | **Should** | Offline ticker join; $0 model cost; no dependencies |
+| **Founded year** | ~2.25M | Secondary ICP signal; not a first-order filter; requires a paid structured source to recover | **Could** | Low ROI relative to the Must stack |
+| **Type (private/unknown), Phone, Contacts** | — | Blocked on website availability or requires an external contact-data provider | **Won't** | Out of scope this window |
+
+**On sector gaps (Part 2 findings)**: Construction, Transportation, and Retail share a single root cause — public regulatory registries (FMCSA, state licensing boards, franchise filings) have never been tapped. That is a **sourcing pipeline problem**, not a field enrichment problem. Closing Construction's 6% sector coverage requires registry ingestion in Cycle 2, not enrichment. Fixing website and industry fill rates improves every sector uniformly and is the prerequisite for any sector-specific work.
 
 ---
 
 ## Part 4 — PoC Enrichment Pipeline
 
-**Goal**: Build a working agentic enrichment pipeline that closes the Construction gap for a real batch (200–1000 records), with structured outputs, confidence scores, retries, cost controls, and a lightweight eval.
+**Goal**: Build a working agentic enrichment pipeline that executes the field cascade from Part 3 (website → industry → type → size) on a real batch, with structured outputs, confidence scores, retries, cost controls, and a lightweight eval.
 
 **Target**: General firmographic enrichment (website, industry, type, size) across 220 records, drawn from the size-stratified sample spanning all sectors.
 
