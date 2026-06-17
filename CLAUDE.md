@@ -29,15 +29,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Subagents
 
-This project uses three subagents defined in `.claude/agents/`:
+This project uses four subagents defined in `.claude/agents/`:
 
 - **data-profiler** — Part 1 extended data quality auditing: field-type-aware distribution checks, cross-field consistency, null pattern analysis. Deterministic only (no LLM calls). Produces a Markdown section for `docs/part1-baseline.md` and `data/processed/part1_profiling_summary.json`.
-- **data-engineer** — produces work: Part 2 gap candidates (`part2_gap_candidates.json`), Part 4 enrichment cascade output (`part4_enriched_sample.parquet`). Never marks its own output as verified.
-- **verifier** — checks work: Part 2 spot-checks (15 records per gap candidate, independent re-derivation from raw data → `docs/part2-audit.md`), Part 4 eval (`eval_runner.py`, precision/recall). Never produces new gaps or enrichments, never edits the data-engineer's output files.
+- **data-engineer** — produces work: Part 2 gap candidates (`part2_gap_candidates.json`), Part 4 enrichment cascade output (`part4_enriched_sample.parquet`). Runs the 4-stage cascade (rules → search → Haiku verify → Sonnet fallback). Every record gets a `status` + `confidence` field; every model call is logged to `shared_observability.jsonl` before moving to the next record. Never marks its own output as verified.
+- **verifier** — checks work: Part 2 spot-checks (15 records per gap candidate, stratified random sample within the gap's slice, independent re-derivation from raw data → `docs/part2-audit.md`), Part 4 eval (`evals/eval_runner.py`, precision/recall/confidence calibration). Also audits the call log for budget compliance. Never produces new gaps or enrichments, never edits the data-engineer's output files. Zero LLM calls during verification — fully deterministic.
+- **target_verifier** — pre-run target calibration: audits proposed data quality targets (website fill rates, precision thresholds) against US macroeconomic benchmarks (SBA, Census SUSB). Generates a size-stratified recommendation matrix (Enterprise/Mid-Market/SMB/Micro) aligned with `config/project.yaml`'s platform blocklist. Requires explicit user approval (`APPROVE`) before writing any config changes. Use before setting or revising targets in `config/project.yaml` or the SKILL.md targets block.
 
 **Invoke explicitly** — auto-delegation is unreliable. E.g.:
 - "Use the data-engineer subagent for Part 2 gap detection"
 - "Use the verifier subagent to spot-check the Part 2 gap candidates"
+- "Use the target_verifier subagent to calibrate website fill rate targets"
 
 **Part 3 (commercial framing) and Part 5 (SKILL.md) are not delegated to subagents** — they are manual/Claude tasks with $0 LLM budget.
 
