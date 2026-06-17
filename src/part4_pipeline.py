@@ -784,12 +784,23 @@ Rules:
   53=Real Estate, 54=Professional Services, 56=Admin/Support, 61=Education, 62=Healthcare,
   71=Arts/Entertainment, 72=Accommodation/Food, 81=Other Services, 92=Government.
 - industry_raw: 2-4 words describing the primary business. null if unclear.
-- still_operating: true if search results show a current website, recent activity, or active LinkedIn page.
-  false if results mention "out of business", "permanently closed", "ceased operations", domain expired/for sale,
-  Google Maps shows "Permanently closed", or no substantive business results exist. null if you cannot determine.
+- still_operating: Apply the following rules in strict priority order — the FIRST matching rule wins:
+  RULE 1 → false: ANY search result title or snippet labels this business as "CLOSED",
+    "Business closed", "Permanently closed", or "out of business" — regardless of whether
+    a website or contact info was also found. Directories (Yelp, Google, BringFido, YP, etc.)
+    marking the listing as CLOSED are authoritative closure evidence. Website existence does
+    NOT override this rule.
+  RULE 2 → false: Results mention "ceased operations", "filed for bankruptcy", "no longer in business",
+    domain expired/for sale, or Google Maps shows "Permanently closed" for this location.
+  RULE 3 → true: No closure signals found in any result AND results confirm current active operations
+    (recent customer reviews explicitly confirming it is open, active bookable appointments, or
+    current-year social/website activity with zero contradicting closure signals anywhere).
+  RULE 4 → null: No closure signals found but cannot confirm active operations either.
 - closure_signals: array of zero or more matching signals: "no_results", "domain_expired", "website_404",
   "closed_announcement", "domain_for_sale", "permanently_closed", "acquired".
   Use "permanently_closed" when Google Maps or a directory explicitly labels the location as permanently closed.
+  Use "closed_announcement" when Yelp, BringFido, Google, YP, or any directory shows "CLOSED" in the
+  listing title or snippet, even if a website was also found.
   Use "acquired" when the company was bought by another entity — set still_operating=null since the acquiring
   entity may still operate under the same name (requires human review).
 - Use null for any field you cannot determine confidently.
@@ -1017,7 +1028,7 @@ def stage1_search(client: anthropic.Anthropic, record: dict, obs: ObservabilityL
     state = record.get("state") or ""
     existing_website = record.get("website") if record.get("poc_condition") == "platform_url" else None
     stage_label = "1.6" if refined_exclude else "1"
-    prompt_ver = "stage1_search_v3_refined" if refined_exclude else "stage1_search_v3"
+    prompt_ver = "stage1_search_v4_refined" if refined_exclude else "stage1_search_v4"
 
     messages = [{"role": "user", "content": stage1_user_prompt(
         name, city, state, existing_website, refined_exclude=refined_exclude)}]
@@ -1305,8 +1316,11 @@ Search the web to determine if this company is still operating.
 Company: {name}
 Location: {city}, {state}
 
-Search for: "{name}" "{state}" (closed OR "permanently closed" OR bankruptcy OR \
+Search for: "{name}" "{city}" "{state}" (closed OR "permanently closed" OR bankruptcy OR \
 "ceased operations" OR "out of business")
+
+Focus on the specific {city}, {state} location — not chain-wide or other-location results.
+If the chain reopened elsewhere but this specific location remains closed, set still_operating=false.
 
 Return ONLY this JSON:
 {{
@@ -1316,15 +1330,21 @@ Return ONLY this JSON:
 }}
 
 Rules:
-- still_operating: true if active. false if results show "permanently closed", \
-"out of business", "ceased operations", bankruptcy filing, or domain expired/for sale. \
-null if you genuinely cannot determine.
+- still_operating: Apply in strict priority order — first matching rule wins:
+  RULE 1 → false: ANY result mentions or labels: "permanently closed", "out of business",
+    "ceased operations", "closed all stores", "filed for bankruptcy/Chapter 11", or
+    a directory listing title contains "CLOSED" for this entity.
+  RULE 2 → false: Domain expired, for sale, or Google Maps shows "Permanently closed".
+  RULE 3 → true: No closure signals and results confirm current active operations.
+  RULE 4 → null: No closure signals found but cannot confirm active operations.
 - closure_signals: array of zero or more: "no_results", "domain_expired", "website_404", \
 "closed_announcement", "domain_for_sale", "permanently_closed", "acquired".
   Use "permanently_closed" when Google Maps or a directory explicitly labels the location \
 as permanently closed.
+  Use "closed_announcement" for bankruptcy filings, store closure announcements, or directory
+  listings that show "CLOSED" in their title or description.
   Use "acquired" when the company was bought by another entity and set still_operating=null.
-- reasoning: one sentence explaining the determination."""
+- reasoning: one sentence citing the specific evidence that determined the verdict."""
 
     try:
         response = client.messages.create(
@@ -1339,7 +1359,7 @@ as permanently closed.
         obs.log_call(
             phase="part_4", model=HAIKU_MODEL,
             tokens=usage.input_tokens + usage.output_tokens, cost=cost,
-            prompt_version="stage3c_closure_verify_v1", outcome="success",
+            prompt_version="stage3c_closure_verify_v2", outcome="success",
             metadata={"handle": record["handle"], "stage": "3c", "raw_response": text},
         )
         result = extract_json(text)

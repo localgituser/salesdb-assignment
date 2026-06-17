@@ -3,6 +3,30 @@
 
 ---
 
+## PM Agentic Dev Loop — What I'd Show in a Loom
+
+These are the moments where directing the agents — not the engineering — made the difference. Each one is a place where I caught a bad default, re-routed the agent, or made a call the model couldn't.
+
+- **Directed the agent on HOW to look, not just what to look at.** For structured fields like industry, I told the agent to focus on the rare, low-frequency values — that's where typos and mislabelled entries cluster. For free-text fields like website, look at the most-repeated values — automated scrapers produce the same junk URL over and over. Without that direction, the agent would have applied the same lens to every field and missed real signal.
+
+- **Tested on 2–3 known cases before scaling to hundreds.** Before running the enrichment pipeline on the full batch, I directed the agent to build small test scripts for each capability — detecting closed businesses, estimating company size, identifying facility type — and run each against a handful of cases where I already knew the right answer. Model choices came from what I observed in those tests, not from assumptions. This caught multiple issues before they compounded at scale.
+
+- **Forced the agent to actually look up the company, not guess from its name.** The agent defaulted to inferring company details from the name alone — no web search. I caught it, pushed back, and required it to look up the actual business. A model reading a company's real website is a fundamentally different thing to a model guessing from a name string. Without that push, every output would have been confident inference dressed up as research.
+
+- **Caught the agent measuring a gap against the wrong baseline.** Before agents sized coverage gaps for commercial framing, I ran a check myself and found ~30 types of placeholder URLs (website builder pages, social profiles, directory listings) being counted as "has a website." The agent would have measured — and pitched — a smaller gap than reality. Directed it to strip those out first, then measure.
+
+- **Read actual records when the summary numbers looked fine.** Aggregate numbers showed website coverage improving. I spot-checked real company records and found URLs from Australian and UK government domains slipping through the filter. Fixed at the rules layer, not patched inside the agent. The lesson: summary stats hide what individual records reveal.
+
+- **Stopped the agent from enriching companies that no longer exist.** A meaningful share of small business records had no web presence at all — no search results, listed as permanently closed, or operating under a different name. The agent was still attempting to enrich them and returning uncertain outputs. I directed it to flag these as "no current web presence" and stop — the pipeline can't fix what isn't there.
+
+- **Read one record and added a field to fix the agent's confusion.** The agent returned a hospital's headcount as 16,000+ employees. The real number for that location was 1,000–5,000 — it had pulled the figure for the entire health system, not the individual site. I added a flag: is this a single location or part of a larger network? With that signal, the agent could pull the right number. Caught from reading one named record, not from any aggregate stat.
+
+- **Asked the agent to log when it was correcting existing data, not just filling gaps.** I added a field asking the model to flag whether the source value was already right or whether it made a correction. Turned out the existing company size data was correct only 32% of the time. That one prompt addition turned the pipeline from a gap-filler into a data quality audit — something the agent would never have surfaced on its own.
+
+- **Held back a field the pipeline was getting wrong with false confidence.** The accuracy on company size was too low to ship. But the worse signal was this: when the model said it was highly confident, it was still wrong almost half the time. A wrong answer delivered with confidence is worse than no answer at all — it actively misleads the sales rep reading it. I pulled the field from the output. That's a product call, not a model call.
+
+---
+
 ## Pre-work: System Setup
 
 Before writing any pipeline code, the scaffolding went in first.

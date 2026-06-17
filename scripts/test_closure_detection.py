@@ -1,14 +1,12 @@
 """
-Test closure detection across two scenarios:
+Test closure detection for three scenarios using the pipeline's actual stage functions.
+All tests use stage1_search or stage3c_closure_verify — no standalone prompts.
 
-1. Stage 1 search path — Coastal Forest Resources Company, Havana FL
-   (original test: web_search tool available, Google Maps says permanently closed)
-
-2. Stage 3c closure verification — Earth Fare Inc., Fletcher NC
-   (new test: simulates parametric path returning still_operating=null, then calls
-   stage3c_closure_verify to resolve via targeted web search)
+1. Stage 1 — Coastal Forest Resources Company, Havana FL (Google Maps: permanently closed)
+2. Stage 3c — Earth Fare Inc., Fletcher NC (chain bankrupt+closed; Stage 1b returned null)
+3. Stage 1 regression — Progressive Pet Training, Columbia SC
+   (pipeline v3 false positive: returned still_operating=true despite Yelp/BringFido "CLOSED")
 """
-import json
 import os
 import sys
 from pathlib import Path
@@ -22,96 +20,6 @@ sys.path.insert(0, str(ROOT))
 COMPANY = "Coastal Forest Resources Company"
 CITY = "Havana"
 STATE = "FL"
-
-PROMPT = f"""\
-Search the web for current information about this company and return ONLY a JSON object.
-
-Company: {COMPANY}
-Location: {CITY}, {STATE}
-
-Return ONLY this JSON:
-{{
-  "still_operating": true,
-  "closure_signals": [],
-  "reasoning": "one sentence"
-}}
-
-Rules:
-- still_operating: true if active. false if results mention "out of business", "permanently closed",
-  "ceased operations", Google Maps shows "Permanently closed", or domain expired/for sale. null if unknown.
-- closure_signals: array of zero or more: "no_results", "domain_expired", "website_404",
-  "closed_announcement", "domain_for_sale", "permanently_closed".
-  Use "permanently_closed" when Google Maps or a directory explicitly labels the location as permanently closed.
-- reasoning: one sentence explaining the determination.
-"""
-
-
-def parse_json_from_text(text: str) -> dict | None:
-    text = text.strip()
-    if text.startswith("```"):
-        lines = text.split("\n")
-        text = "\n".join(lines[1:]).rsplit("```", 1)[0].strip()
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        # Try to find a JSON block within the text
-        start = text.find("{")
-        end = text.rfind("}") + 1
-        if start != -1 and end > start:
-            try:
-                return json.loads(text[start:end])
-            except json.JSONDecodeError:
-                pass
-    return None
-
-
-def run_claude(model_id: str, label: str) -> dict:
-    import anthropic
-    client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
-    resp = client.messages.create(
-        model=model_id,
-        max_tokens=512,
-        tools=[{"type": "web_search_20250305", "name": "web_search", "max_uses": 2}],
-        messages=[{"role": "user", "content": PROMPT}],
-    )
-    # Extract final text block (after tool use)
-    text = ""
-    for block in resp.content:
-        if hasattr(block, "text"):
-            text = block.text
-    return {"model": label, "raw": text, "parsed": parse_json_from_text(text)}
-
-
-def run_gemini() -> dict:
-    from google import genai
-    from google.genai import types
-    client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
-    resp = client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=PROMPT,
-        config=types.GenerateContentConfig(
-            tools=[types.Tool(google_search=types.GoogleSearch())],
-        ),
-    )
-    text = resp.text or ""
-    return {"model": "gemini-2.5-flash (grounding)", "raw": text, "parsed": parse_json_from_text(text)}
-
-
-def run_perplexity() -> dict:
-    import requests
-    headers = {
-        "Authorization": f"Bearer {os.environ['PERPLEXITY_API_KEY']}",
-        "Content-Type": "application/json",
-    }
-    payload = {
-        "model": "sonar",
-        "messages": [{"role": "user", "content": PROMPT}],
-        "max_tokens": 512,
-    }
-    resp = requests.post("https://api.perplexity.ai/chat/completions", json=payload, headers=headers, timeout=30)
-    resp.raise_for_status()
-    text = resp.json()["choices"][0]["message"]["content"].strip()
-    return {"model": "perplexity-sonar", "raw": text, "parsed": parse_json_from_text(text)}
 
 
 def print_result(r: dict) -> None:
@@ -133,36 +41,47 @@ def print_result(r: dict) -> None:
         print(f"  raw: {r['raw'][:400]}")
 
 
-runners = [
-    ("claude", "claude-haiku-4-5", "claude-haiku-4-5 + web_search (max_uses=2)"),
-    # ("claude", "claude-sonnet-4-5", "claude-sonnet-4-5 + web_search"),
-    # ("gemini", None, None),
-    # Perplexity skipped — account has no credits (quota exhausted)
-    # ("perplexity", None, None),
-]
+from src.shared.observability import ObservabilityLogger
+from src.part4_pipeline import stage1_search
+import anthropic as _anthropic
 
-results = []
+_client_top = _anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+_obs_top = ObservabilityLogger()
+
+_coastal_record = {
+    "handle": "company/coastal-forest-resources-company",
+    "name": COMPANY,
+    "city": CITY,
+    "state": STATE,
+    "website": None,
+    "poc_condition": "missing_website",
+    "poc_segment": "micro",
+}
+
 print(f"Target: {COMPANY}, {CITY}, {STATE}")
 print("Ground truth: PERMANENTLY CLOSED (Google Maps)\n")
-print("Running queries...")
+print("Running stage1_search (pipeline path)...")
 
-for runner_type, model_id, label in runners:
-    try:
-        if runner_type == "claude":
-            r = run_claude(model_id, label)
-        elif runner_type == "gemini":
-            r = run_gemini()
-        else:
-            r = run_perplexity()
-        results.append(r)
-        print(f"  {r['model']}: done")
-    except Exception as e:
-        name = label or ("gemini-2.0-flash" if runner_type == "gemini" else "perplexity-sonar")
-        results.append({"model": name, "raw": "", "parsed": None, "error": str(e)})
-        print(f"  {name}: ERROR — {e}")
+_coastal_result = stage1_search(_client_top, _coastal_record, _obs_top)
+_coastal_operating = _coastal_result.get("still_operating")
+_coastal_signals = _coastal_result.get("closure_signals", [])
+_ANY_CLOSURE = {"permanently_closed", "closed_announcement", "acquired", "no_results",
+                "domain_expired", "domain_for_sale"}
+_coastal_pass = _coastal_operating is False or bool(set(_coastal_signals) & _ANY_CLOSURE)
+
+results = [{
+    "model": "stage1_search (Haiku v4 + web_search)",
+    "raw": str(_coastal_result),
+    "parsed": {
+        "still_operating": _coastal_operating,
+        "closure_signals": _coastal_signals,
+        "reasoning": _coastal_result.get("reasoning"),
+    },
+}]
 
 for r in results:
     print_result(r)
+print(f"\n  {'PASS ✓' if _coastal_pass else 'FAIL ✗'} — expected still_operating=false or closure signal present")
 
 
 # ── Stage 3c test: Earth Fare Inc. (parametric-path closure verification) ─────
@@ -200,5 +119,40 @@ print(f"  _stage          : {_result.get('_stage')}")
 
 _operating = _result.get("still_operating")
 _signals = _result.get("closure_signals", [])
-_pass = _operating is False or "permanently_closed" in _signals
-print(f"\n  {'PASS ✓' if _pass else 'FAIL ✗'} — expected still_operating=false or permanently_closed in signals")
+_pass = _operating is False or bool(set(_signals) & _ANY_CLOSURE)
+print(f"\n  {'PASS ✓' if _pass else 'FAIL ✗'} — expected still_operating=false or any closure signal present")
+
+
+# ── Stage 1 regression: Progressive Pet Training (directory-CLOSED false positive) ───
+
+print("\n\n" + "=" * 60)
+print("STAGE 1 REGRESSION: Progressive Pet Training, Columbia SC")
+print("Ground truth: CLOSED (Yelp + directory listings show 'CLOSED' in title/meta)")
+print("Scenario: Stage 1 v3 returned still_operating=true (false positive)")
+print("Root cause: website found → model ignored directory closure signals")
+print("=" * 60)
+
+from src.part4_pipeline import stage1_user_prompt, stage1_search, HAIKU_MODEL
+
+_ppt_record = {
+    "handle": "company/progressive-pet-training",
+    "name": "Progressive Pet Training",
+    "city": "Columbia",
+    "state": "South Carolina",
+    "website": None,
+    "poc_condition": "missing_website",
+    "poc_segment": "micro",
+}
+
+print("\nCalling stage1_search (same path as pipeline)...")
+_ppt_result = stage1_search(_client, _ppt_record, _obs)
+
+_ppt_operating = _ppt_result.get("still_operating")
+_ppt_signals = _ppt_result.get("closure_signals", [])
+_ppt_pass = _ppt_operating is False or bool(set(_ppt_signals) & _ANY_CLOSURE)
+print(f"\n  still_operating : {_ppt_operating}")
+print(f"  closure_signals : {_ppt_signals}")
+print(f"  reasoning       : {_ppt_result.get('reasoning')}")
+print(f"  candidate_website: {_ppt_result.get('candidate_website')}")
+print(f"  _stage          : {_ppt_result.get('_stage')}")
+print(f"\n  {'PASS ✓' if _ppt_pass else 'FAIL ✗'} — expected still_operating=false or closure signal present")
