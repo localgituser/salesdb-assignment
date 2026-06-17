@@ -27,6 +27,9 @@ FIELDS = ["website", "type", "industry", "size"]
 
 SIZE_BANDS = ["1-10", "11-50", "51-200", "201-500", "501-1K", "1K-5K", "5K-10K", "10K+"]
 
+# Confidence calibration: at this threshold, what fraction of predictions are correct?
+CONFIDENCE_CALIBRATION_THRESHOLD = 0.80
+
 
 def size_band_distance(a: Optional[str], b: Optional[str]) -> Optional[int]:
     """Ordinal distance between two size bands. None if either is not in the enum."""
@@ -103,6 +106,10 @@ def run_eval() -> dict:
     size_within_one: int = 0
     size_total_mismatches: int = 0
     size_band_distances: list[int] = []
+    # Confidence calibration: at >= CONFIDENCE_CALIBRATION_THRESHOLD, what % are correct?
+    calib_counters: dict[str, dict[str, int]] = {
+        f: {"high_conf_correct": 0, "high_conf_total": 0} for f in FIELDS
+    }
 
     matched = 0
     unmatched_handles = []
@@ -163,6 +170,19 @@ def run_eval() -> dict:
                         if dist <= 1:
                             size_within_one += 1
 
+            # Confidence calibration: track high-confidence predictions
+            conf_raw = pred.get(f"{field}_confidence")
+            if conf_raw is not None:
+                try:
+                    conf_val = float(conf_raw)
+                except (TypeError, ValueError):
+                    conf_val = None
+                if conf_val is not None and conf_val >= CONFIDENCE_CALIBRATION_THRESHOLD:
+                    if gt_val is not None and pred_val is not None:
+                        calib_counters[field]["high_conf_total"] += 1
+                        if gt_val == pred_val:
+                            calib_counters[field]["high_conf_correct"] += 1
+
     # Build results
     field_metrics = {f: compute_metrics(**counters[f]) for f in FIELDS}
     seg_metrics = {
@@ -182,6 +202,38 @@ def run_eval() -> dict:
 
     avg_band_dist = round(sum(size_band_distances) / len(size_band_distances), 2) if size_band_distances else None
 
+    # Confidence calibration summary
+    calibration: dict = {}
+    for field in FIELDS:
+        total = calib_counters[field]["high_conf_total"]
+        correct = calib_counters[field]["high_conf_correct"]
+        calibration[field] = {
+            "high_conf_count": total,
+            "high_conf_correct": correct,
+            "calibration_rate": round(correct / total, 3) if total > 0 else None,
+        }
+
+    # Source data reliability: original_correct breakdown by field × poc_segment
+    all_segments = sorted(seg_counters.keys())
+    source_reliability: dict = {}
+    for field in FIELDS:
+        col = f"{field}_original_correct"
+        if col not in enriched_df.columns:
+            continue
+        source_reliability[field] = {}
+        for seg in all_segments:
+            sub = enriched_df[enriched_df["poc_segment"] == seg][col] if "poc_segment" in enriched_df.columns else enriched_df[col]
+            correct = int((sub == True).sum())   # noqa: E712
+            incorrect = int((sub == False).sum())  # noqa: E712
+            unknown = int(sub.isna().sum())
+            total = correct + incorrect
+            source_reliability[field][seg] = {
+                "correct": correct,
+                "incorrect": incorrect,
+                "unknown": unknown,
+                "reliability": round(correct / total, 3) if total > 0 else None,
+            }
+
     results = {
         "summary": {
             "ground_truth_records": len(ground_truth),
@@ -199,6 +251,8 @@ def run_eval() -> dict:
             "within_one_band_rate": round(size_within_one / size_total_mismatches, 3) if size_total_mismatches else None,
             "avg_band_distance": avg_band_dist,
         },
+        "source_reliability": source_reliability,
+        "calibration": calibration,
         "mismatches": mismatches,
     }
 
@@ -253,6 +307,31 @@ def print_report(results: dict) -> None:
             print(f"  {seg:<15} P={p or 'N/A'}  R={r or 'N/A'}")
         print()
 
+    # Source data reliability
+    sr = results.get("source_reliability", {})
+    if sr:
+        all_segs = sorted({seg for field_data in sr.values() for seg in field_data})
+        print("Source data reliability (original_correct by field × segment):")
+        seg_header = "  ".join(f"{s:<14}" for s in all_segs)
+        print(f"  {'Field':<10}  {'Metric':<12}  {seg_header}")
+        print("  " + "-" * (10 + 2 + 12 + 2 + 16 * len(all_segs)))
+        for field in FIELDS:
+            if field not in sr:
+                continue
+            correct_vals = "  ".join(
+                f"{sr[field].get(s, {}).get('correct', '-'):<14}" for s in all_segs
+            )
+            incorrect_vals = "  ".join(
+                f"{sr[field].get(s, {}).get('incorrect', '-'):<14}" for s in all_segs
+            )
+            rel_vals = "  ".join(
+                f"{sr[field].get(s, {}).get('reliability') or 'N/A'!s:<14}" for s in all_segs
+            )
+            print(f"  {field:<10}  {'correct':<12}  {correct_vals}")
+            print(f"  {'':10}  {'incorrect':<12}  {incorrect_vals}")
+            print(f"  {'':10}  {'reliability':<12}  {rel_vals}")
+        print()
+
     # Mismatches
     if results["mismatches"]:
         print(f"Mismatches ({len(results['mismatches'])}):")
@@ -261,6 +340,21 @@ def print_report(results: dict) -> None:
             print(f"    {mm['field']}: expected={mm['gt']!r}  got={mm['pred']!r}")
         if len(results["mismatches"]) > 10:
             print(f"  ... and {len(results['mismatches']) - 10} more")
+        print()
+
+    # Confidence calibration
+    calib = results.get("calibration", {})
+    if calib:
+        print(f"Confidence calibration (at >= {CONFIDENCE_CALIBRATION_THRESHOLD:.0%}):")
+        print(f"{'Field':<12} {'High-conf preds':>16} {'Correct':>9} {'Calibration':>13}")
+        print("-" * 54)
+        for field in FIELDS:
+            c = calib.get(field, {})
+            total = c.get("high_conf_count", 0)
+            correct = c.get("high_conf_correct", 0)
+            rate = c.get("calibration_rate")
+            rate_str = f"{rate:.1%}" if rate is not None else "   N/A"
+            print(f"{field:<12} {total:>16} {correct:>9} {rate_str:>13}")
         print()
 
     # One-paragraph weakness analysis
@@ -279,9 +373,9 @@ def print_report(results: dict) -> None:
                      f"is leaving too many gaps unfilled.")
     if not weak_fields and not low_recall:
         notes.append("All fields cleared the 70% precision and 60% recall bar on this "
-                     "sample. Caveat: the eval set is small (20 records); confidence intervals "
-                     "are wide and the true error rate on unseen micro/SMB records — which are "
-                     "harder to find via search — is likely higher than what this sample shows.")
+                     "sample. Caveat: the eval set is small; confidence intervals are wide "
+                     "and the true error rate on unseen SMB records — which are harder to "
+                     "find via search — is likely higher than what this sample shows.")
     print("\n".join(notes) if notes else "No clear weaknesses in this sample.")
 
 

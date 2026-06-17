@@ -55,7 +55,7 @@ LLM budget: **self-imposed $10 ceiling** (the brief sets no budget — this is a
 │   ├── part3-commercial.md   # Part 3 deliverable
 │   ├── part4-enrichment.md   # Part 4 deliverable
 │   ├── part5-skill.md        # Part 5 deliverable
-│   ├── part6-plan.md         # Part 6 deliverable
+│   ├── part6-90day-plan.md   # Part 6 deliverable
 │   ├── part0-discovery.md    # Part 0 discovery notes
 │   ├── strategy_v3.md        # this file
 │   ├── db_schema.md

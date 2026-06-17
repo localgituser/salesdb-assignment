@@ -1,0 +1,74 @@
+priority,handle,name,city,state,poc_segment,fields_to_review,website_original,website_enriched,website_confidence,website_pipeline_stage,type_original,type_enriched,type_confidence,type_pipeline_stage,industry_original,industry_enriched,industry_confidence,industry_pipeline_stage,size_original,size_enriched,size_confidence,size_pipeline_stage
+1,company/data-group-ltd,DATA GROUP LTD,Annandale,Virginia,enterprise,"website, type, industry",datagroup.co.nz,datagroup.co.nz,0.45,sonnet,,Privately Held,0.6,sonnet,,Information Technology Services,0.5,sonnet,,,,
+1,company/impact-group-brokerage,Impact Group Brokerage,Boise,Idaho,enterprise,,,,,,,,,,,,,,,,,
+1,company/magicsound-63,MagicSound 63,Princeton,Nueva Jersey,enterprise,"type, industry, size",,,,,Nonprofit,Nonprofit,0.5,sonnet,furniture and home furnishings manufacturing,furniture and home furnishings manufacturing,0.45,sonnet,1K-5K,1K-5K,0.5,sonnet
+1,company/dollar-express,Dollar Express Stores LLC,Charlotte,North Carolina,enterprise,size,,,,,,,,,,,,,1K-5K,1K-5K,0.4,haiku
+1,company/united-cerebral-palsy-of-nyc-inc,"UNITED CEREBRAL PALSY OF NYC, INC",New York,New York,enterprise,size,,,,,,,,,,,,,1K-5K,501-1K,0.5,haiku
+1,company/cyber-cell,cyber-cell,Kettleman City,California,enterprise,"type, industry",,,,,Government Agency,Government Agency,0.4,sonnet,alternative dispute resolution,IT custom software development,0.6,sonnet,,,,
+1,company/vivid-horizon-group,Vivid Horizon Group,Los Angeles,California,enterprise,industry,,,,,,,,,financial services,business consulting and services,0.6,haiku,,,,
+1,company/north-central-staffing-inc,"NORTH CENTRAL STAFFING, INC",Middleton,Wisconsin,enterprise,,,,,,,,,,,,,,,,,
+1,company/aws-azure-devops-solution-architect-jobs-in-us,Aws Azure Devops Solution Architect Jobs in US,Milpitas,California,enterprise,,,,,,,,,,,,,,,,,
+1,company/faegre-baker-daniels-llp,Faegre Baker Daniels LLP,Chicago,Illinois,enterprise,,,,,,,,,,,,,,,,,
+1,company/amazon-certification-exam,AMAZON Certification Exam,El Paso,Texas,enterprise,"type, industry, size",,,,,Nonprofit,Nonprofit,0.5,sonnet,higher education,Professional Training and Coaching,0.6,sonnet,1K-5K,1K-5K,0.5,sonnet
+1,company/oxy-finance,OXY-Finance,Sunnyvale,California,enterprise,"type, size",,,,,Public Company,Public Company,0.5,sonnet,,,,,501-1K,501-1K,0.5,sonnet
+1,company/taurus-defense-solutions-llc,B,New York,New York,enterprise,size,,,,,,,,,,,,,10K+,10K+,0.4,sonnet
+1,company/whollyone,WhollyOne,Los Angeles,California,enterprise,"type, industry, size",,,,,Public Company,Public Company,0.5,sonnet,it services and it consulting,IT Services and IT Consulting,0.55,sonnet,10K+,10K+,0.5,sonnet
+1,company/alpine-access,Alpine Access,Tampa,Florida,enterprise,,,,,,,,,,,,,,,,,
+1,company/tienda-antigua-guatemala,Tienda Antigua Guatemala,East Ellijay,Georgia,enterprise,size,,,,,,,,,,,,,501-1K,1-10,0.5,sonnet
+1,company/cole-national-corporation,Cole National Corporation,Mason,Ohio,enterprise,,,,,,,,,,,,,,,,,
+1,company/boeing-commercial-space-company,BOEING COMMERCIAL SPACE COMPANY,Kent,Washington,enterprise,,,,,,,,,,,,,,,,,
+1,company/one-more-startup-in-stealth-mode,Startup (in Stealth Mode),San Francisco,California,enterprise,,,,,,,,,,,,,,,,,
+2,company/uacc,Uacc,Hurst,Texas,mid_market,"website, type, industry, size",uacc.ae,uacc.ae,0.45,sonnet,,Privately Held,0.6,sonnet,,Professional Services,0.45,sonnet,51-200,51-200,0.5,sonnet
+2,company/lycee-francais-intl,Lycee Francais Intl,Corte Madera,California,mid_market,,,,,,,,,,,,,,,,,
+2,company/recellular-inc,Recellular Inc,Gorham,Maine,mid_market,,,,,,,,,,,,,,,,,
+2,company/shop-rite-corp,Shop Rite Corp,Lake Charles,Louisiana,mid_market,,,,,,,,,,,,,,,,,
+2,company/glu-hospitality,Glu Hospitality,Philadelphia,Pennsylvania,mid_market,,,,,,,,,,,,,,,,,
+2,company/apartment-management-professionals-llc,"APARTMENT MANAGEMENT PROFESSIONALS, LLC",Indianapolis,Indiana,mid_market,,,,,,,,,,,,,,,,,
+2,company/digital-experts-llc,Digital Experts LLC,Sheridan,Wyoming,mid_market,"type, size",,,,,Self-Owned,Self-Owned,0.6,sonnet,,,,,51-200,51-200,0.5,sonnet
+2,company/house2homeacquisitions,Mopar Family of Arizona,West Valley,Arizona,mid_market,"type, size",,,,,Nonprofit,Nonprofit,0.5,sonnet,,,,,51-200,51-200,0.4,sonnet
+2,company/moore-business-forms-&-systems,Moore Business Forms & Systems,Portland,Oregon,mid_market,,,,,,,,,,,,,,,,,
+2,company/gatx-logistics,Gatx Logistics,Arlington,Texas,mid_market,type,,,,,,Privately Held,0.55,sonnet,,,,,,,,
+2,company/bmci-inc,BMCI Inc,Vancouver,Washington,mid_market,industry,,,,,,,,,defense and space manufacturing,manufacturing,0.6,haiku,,,,
+2,company/olde-discount,Olde Discount,Morristown,New Jersey,mid_market,"type, industry, size",,,,,,Privately Held,0.5,sonnet,it services and it consulting,Financial Services,0.45,sonnet,51-200,51-200,0.5,sonnet
+2,company/hpi-direct---a-division-of-superior-uniform-group,HPI Direct - A Division of Superior Uniform Group,Alpharetta,Georgia,mid_market,,,,,,,,,,,,,,,,,
+2,company/imagine-theatre-inc,Imagine Theatre Inc,Livermore,California,mid_market,type,,,,,,Nonprofit,0.55,sonnet,,,,,,,,
+2,company/veterans-admin,Veterans Admin,Duluth,Georgia,mid_market,,,,,,,,,,,,,,,,,
+2,company/countrywide-home-loan-inc,Countrywide Home Loan Inc,Destin,Florida,mid_market,type,,,,,,Privately Held,0.6,haiku,,,,,,,,
+2,company/denise-rush,Denise Rush (she/her/hers),Boston,Massachusetts,mid_market,,,,,,,,,,,,,,,,,
+2,company/m-s-a-rose-bonaparte,M. S. A. Rose-Bonaparte,Long Beach,California,mid_market,"type, size",,,,,Partnership,Partnership,0.6,sonnet,,,,,51-200,51-200,0.5,sonnet
+2,company/stealth-mode-start-up,Stealth Mode Start-up,San Francisco,California,mid_market,industry,,,,,,,,,software development,it services and it consulting,0.6,haiku,,,,
+2,company/roads-bridges,Roads & Bridges,Nashville,Tennessee,mid_market,,,,,,,,,,,,,,,,,
+3,company/rs-imports-exports,RS IMPORTS EXPORTS,South San Francisco,California,smb,website,,rsiegy.com,0.45,haiku,,,,,,,,,,,,
+3,company/llsm,Legends Legacy Sports Marketing,Detroit,Michigan,smb,size,,,,,,,,,,,,,11-50,1-10,0.5,haiku
+3,company/sakaida-&-sons-trucking-inc,"SAKAIDA & SONS TRUCKING, INC",Reseda,California,smb,,,,,,,,,,,,,,,,,
+3,company/fernandez-construction,Fernandez Construction,San Antonio,Texas,smb,,,,,,,,,,,,,,,,,
+3,company/lee-mathson-middle-school,Lee Mathson Middle School,San Jose,California,smb,,,,,,,,,,,,,,,,,
+3,company/primetechnologieonline,Prime Technologies,New York,New York,smb,,,,,,,,,,,,,,,,,
+3,company/win-win-professional-marketing-sales-association,Win/Win Professional Marketing & Sales Association,Kalamazoo,Michigan,smb,"type, industry, size",,,,,Privately Held,Nonprofit,0.55,sonnet,advertising services,professional associations services,0.4,sonnet,11-50,11-50,0.4,sonnet
+3,company/mona’s-signature-wings,Mona’s Signature Wings,North Charleston,South Carolina,smb,type,,,,,,Self-Owned,0.5,sonnet,,,,,,,,
+3,company/kwikstop-food-mart,Kwikstop Food Mart,Dubuque,Iowa,smb,,,,,,,,,,,,,,,,,
+3,company/fasfax,Fasfax,Nashua,New Hampshire,smb,,,,,,,,,,,,,,,,,
+3,company/vaughan-leasing-lc,"VAUGHAN LEASING, LC",Kismet,Kansas,smb,industry,,,,,,,,,,Equipment Leasing,0.6,sonnet,,,,
+3,company/caredent-dental,Caredent Dental,San Gabriel,California,smb,type,,,,,,Self-Owned,0.5,sonnet,,,,,,,,
+3,company/heminger-gary-r,Heminger Gary R,Houston,Texas,smb,,,,,,,,,,,,,,,,,
+3,company/city-bags,City Bags,Los Angeles,California,smb,type,,,,,,Privately Held,0.6,haiku,,,,,,,,
+3,company/allied-ems-svc,Allied EMS Svc,Mancelona,Michigan,smb,,,,,,,,,,,,,,,,,
+3,company/3plllc,3PL,Los Angeles,California,smb,,,,,,,,,,,,,,,,,
+3,company/staats-construction-inc,Staats Construction Inc,Mason,West Virginia,smb,,,,,,,,,,,,,,,,,
+3,company/briargrove-animal-clinic,Briargrove Animal Clinic,Houston,Texas,smb,size,,,,,,,,,,,,,11-50,11-50,0.5,sonnet
+3,company/kong-telecom-llc,KONG TELECOM LLC,Overland Park,Kansas,smb,size,,,,,,,,,,,,,11-50,11-50,0.5,sonnet
+3,company/comscape-communications,COMSCAPE COMMUNICATIONS,Escondido,California,smb,size,,,,,,,,,,,,,11-50,11-50,0.4,sonnet
+3,company/ppo-l.c.,"PPO, L.C.",Cedar Rapids,Iowa,smb,industry,,,,,,,,,,Professional Services,0.5,sonnet,,,,
+3,company/la-canada-companies-llc,"La Canada Companies, LLC",Oro Valley,Arizona,smb,,,,,,,,,,,,,,,,,
+3,company/zaring-land-acquisition-and-development-central-north-carolina-llc,"ZARING LAND ACQUISITION AND DEVELOPMENT CENTRAL NORTH CAROLINA, LLC",Cincinnati,Ohio,smb,,,,,,,,,,,,,,,,,
+3,company/kinfosystem-group,KIS GROUP,Kenitra,Massachusetts,smb,"type, industry",,,,,Privately Held,Privately Held,0.6,sonnet,computers and electronics manufacturing,computers and electronics manufacturing,0.5,sonnet,,,,
+3,company/mask-entertainment,Mask Entertainment,Naples,Florida,smb,,,,,,,,,,,,,,,,,
+3,company/woodstock-theological-center-at-georgetown-university,Woodstock Theological Center at Georgetown University,Washington,District of Columbia,smb,,,,,,,,,,,,,,,,,
+3,company/consult-for-america-at-lmu,Consult for America at LMU,Los Angeles,California,smb,size,,,,,,,,,,,,,11-50,1-10,0.4,haiku
+3,company/saint-john-s-senate,Saint John's Senate,Collegeville,Minnesota,smb,,,,,,,,,,,,,,,,,
+3,company/cati-lab,CGU-Accenture Talent Innovation Lab,Claremont,California,smb,,,,,,,,,,,,,,,,,
+4,company/pacific-power-logistics,Pacific Power Logistics,Signal Hill,California,micro,website,,pacpowerlogistics.taicloud.net,0.45,haiku,,,,,,,,,,,,
+4,company/bluewater-consulting2003,Bluewater Consulting,Alexandria,Virginia,micro,,,,,,,,,,,,,,,,,
+4,company/greenpromisecannabis,Green Promise Cannabis Consulting,San Francisco,California,micro,,,,,,,,,,,,,,,,,
+4,company/nb-financial-solutions,NB Financial Solutions,Rancho Cucamonga,California,micro,industry,,,,,,,,,real estate,financial services,0.6,sonnet,,,,
+4,company/flip-flop-kid-swap,Flip Flop Kid Swap,Hastings,Minnesota,micro,size,,,,,,,,,,,,,1-10,1-10,0.4,haiku

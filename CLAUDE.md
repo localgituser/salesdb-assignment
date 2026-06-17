@@ -171,7 +171,7 @@ python evals/eval_runner.py  # Precision/recall against ground_truth.json
 - `data/enriched/part4_enriched_sample.parquet` — Enriched records post-Part 4
 
 ### Documentation
-- `docs/` — Assessor-facing deliverables, one file per Part (part1-baseline.md through part6-plan.md)
+- `docs/` — Assessor-facing deliverables, one file per Part (part1-baseline.md through part6-90day-plan.md)
 - `docs/part0-discovery.md` — Part 0 initial data discovery (global dataset mismatch finding; historical artifact)
 - `prompts/part2_audit_v1.txt` — LLM prompt for Part 2 gap detection
 - `prompts/part4_enrichment_v1.txt` — LLM prompt for Part 4 enrichment

@@ -145,11 +145,7 @@ Part 2 ran a **semantic record-quality audit** across the top 5 gap sectors iden
 
 **Why 100/gap instead of ~3,500**: A state-stratified sample of 3,500 would cost ~$14 at Haiku rates — over the entire $10 project ceiling. The audit goal was qualitative pattern detection (mislabels, bad URLs, platform URLs missed), not distributional precision by state. At an observed issue rate of ~31% in the first gap (31/99 records flagged), n=100 gives more than sufficient power to characterise systematic error types. State-level stratification would matter for estimating *prevalence* by state, which is a Part 4 enrichment concern, not a gap-detection concern.
 
-**Verifier spot-check sample size (n=15 per gap)** — derivation: We want a sample large enough that, if a claimed gap is real at prevalence p ≥ 0.20 within the gap's slice, we will observe at least one positive case with high probability. Under a binomial model:
-
-> P(observe zero positives | n=15, p=0.20) = (1 − 0.20)^15 = 0.8^15 ≈ 0.0352
-
-So if the true within-slice prevalence is ≥ 20%, there is only a ~3.5% chance the 15-record spot-check sees zero hits — i.e., **~96.5% power to reject the "no gap" null at the 20% prevalence threshold**. For lower prevalence (p = 0.10), power drops to ~79% — acceptable for directional confirmation but not a guarantee. The 20% threshold is the operational floor for "structural" gaps in this audit; finer-grained gaps are flagged but not ranked.
+**Verifier spot-check sample size (n=15 per gap)** — n=15 gives ~96.5% power to detect a structural gap at ≥20% within-slice prevalence. Sufficient for directional confirmation; finer-grained gaps (p < 10%) are flagged but not ranked.
 
 ### Part 4 Enrichment PoC Sample (~300 records) — Single-Run, Size-Stratified
 

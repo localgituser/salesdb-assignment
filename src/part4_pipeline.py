@@ -765,10 +765,17 @@ Rules:
   null  → genuinely unclear.
   Key test: does the entity in this record sign the payroll for multiple sites? If yes → false.
 - candidate_size: depends on is_single_facility.
-  If is_single_facility=true: prefer the headcount for this specific location or facility.
-    If only a parent system's total is available, set candidate_size=null and size_confidence=0.30.
-  If is_single_facility=false: use the total organizational headcount for this entity across
-    all locations it operates or manages.
+  If is_single_facility=true: find the total employees who work for this business entity
+    (e.g. all staff at this hospital, this store, this franchise). Do NOT return a sub-unit
+    or department count. If the only figure available is a parent organisation's total —
+    not this entity's own headcount — set candidate_size=null and size_confidence=0.30.
+  If is_single_facility=false: find the consolidated total headcount across all the
+    businesses this entity operates or manages.
+  Geographic entity exception (takes precedence over is_single_facility): if the name contains
+    a geographic qualifier (e.g. "USA", "UK", "Americas", a country or region name) indicating
+    a regional subsidiary of a global parent — use only that entity's own headcount, not the
+    parent's worldwide total. If web results only surface the global figure (e.g. "Acme Corp has
+    7,000 employees worldwide"), set candidate_size=null and size_confidence=0.30.
   Size bands: 1-10, 11-50, 51-200, 201-500, 501-1K (501–1000), 1K-5K (1001–5000), 5K-10K (5001–10000), 10K+ (over 10000).
   Must be exactly one of: {", ".join(SIZE_ENUM)}
 - naics_2digit: the NAICS 2-digit sector code (integer) that best describes the primary business.
@@ -830,10 +837,17 @@ Rules:
   null  → genuinely unclear.
   Key test: does the entity in this record sign the payroll for multiple sites? If yes → false.
 - candidate_size: depends on is_single_facility.
-  If is_single_facility=true: prefer the headcount for this specific location or facility.
-    If only a parent system's total is available, set candidate_size=null and size_confidence=0.30.
-  If is_single_facility=false: use the total organizational headcount for this entity across
-    all locations it operates or manages.
+  If is_single_facility=true: find the total employees who work for this business entity
+    (e.g. all staff at this hospital, this store, this franchise). Do NOT return a sub-unit
+    or department count. If the only figure available is a parent organisation's total —
+    not this entity's own headcount — set candidate_size=null and size_confidence=0.30.
+  If is_single_facility=false: find the consolidated total headcount across all the
+    businesses this entity operates or manages.
+  Geographic entity exception (takes precedence over is_single_facility): if the name contains
+    a geographic qualifier (e.g. "USA", "UK", "Americas", a country or region name) indicating
+    a regional subsidiary of a global parent — use only that entity's own headcount, not the
+    parent's worldwide total. If only the global figure is available, set candidate_size=null
+    and size_confidence=0.30.
   Must be exactly one of: {", ".join(SIZE_ENUM)}
 - naics_2digit: NAICS 2-digit sector code (integer). null if unclear.
 - industry_raw: 2-4 words describing the primary business. null if unclear.
@@ -1190,20 +1204,37 @@ STAGE3B_SYSTEM = """\
 You are a company size lookup assistant. Use web search to find the employee count \
 for the specific company entity provided. Return ONLY a JSON object."""
 
-def stage3b_size_search(client: anthropic.Anthropic, record: dict, obs: ObservabilityLogger) -> dict:
+def stage3b_size_search(client: anthropic.Anthropic, record: dict, obs: ObservabilityLogger,
+                        entity_verdict: str = "MATCH",
+                        prior_entity: Optional[str] = None) -> dict:
     """Haiku + targeted web_search: find entity-specific employee count.
 
-    Uses site:linkedin.com/company and structured data sources to avoid corporate-wide
-    headcount bleed that afflicts general search results.
+    entity_verdict / prior_entity are used to build a context block that steers
+    the LLM away from a previously-identified wrong entity (PARENT or SUBSIDIARY).
     """
     name = record.get("name") or ""
     state = record.get("state") or ""
+
+    if entity_verdict == "PARENT" and prior_entity:
+        entity_context = (
+            f"\nIMPORTANT: A previous search returned '{prior_entity}', which is the PARENT "
+            f"organisation of '{name}'. Do NOT use '{prior_entity}'s employee count. "
+            f"Find the total employees for '{name}' specifically as its own business entity."
+        )
+    elif entity_verdict == "SUBSIDIARY" and prior_entity:
+        entity_context = (
+            f"\nIMPORTANT: A previous search returned '{prior_entity}', which is a "
+            f"subsidiary/branch of '{name}'. Do NOT use '{prior_entity}'s count. "
+            f"Find the total employees for '{name}' as the full parent organisation."
+        )
+    else:
+        entity_context = ""
 
     prompt = f"""\
 Find the employee count for this specific company entity (not its parent or subsidiaries).
 
 Company: {name}
-State: {state}
+State: {state}{entity_context}
 
 Search for "{name}" {state} employees site:linkedin.com/company OR site:craft.co OR site:dnb.com
 
@@ -1217,8 +1248,13 @@ Return ONLY this JSON:
 
 Rules:
 - candidate_size must be exactly one of: {", ".join(SIZE_ENUM)}
-- Prefer location-specific or entity-specific headcount over corporate totals.
-- If ONLY a parent org total is found (not this specific entity), set candidate_size=null.
+- Find the total employees of this business entity — all staff who work for this company.
+  Do NOT return a sub-unit, department, or single-office headcount.
+  If the only figure available is a parent organisation's total, return null.
+  Geographic entity exception: if the name contains a geographic qualifier (USA, UK, Americas,
+  a country or region name) indicating a regional subsidiary, the entity-specific headcount
+  means that geographic entity's own workforce only — not the global parent's worldwide total.
+  If only the global total is available (e.g. "Acme has 7,000 employees worldwide"), return null.
 - size_confidence: 0.0 = no evidence, 1.0 = certain structured data from authoritative source."""
 
     try:
@@ -1234,8 +1270,10 @@ Rules:
         obs.log_call(
             phase="part_4", model=HAIKU_MODEL,
             tokens=usage.input_tokens + usage.output_tokens, cost=cost,
-            prompt_version="stage3b_size_search_v1", outcome="success",
-            metadata={"handle": record["handle"], "stage": "3b", "raw_response": text},
+            prompt_version="stage3b_size_search_v2", outcome="success",
+            metadata={"handle": record["handle"], "stage": "3b",
+                      "entity_verdict": entity_verdict, "prior_entity": prior_entity,
+                      "raw_response": text},
         )
         result = extract_json(text)
         result["_stage"] = "3b"
@@ -1436,6 +1474,7 @@ def enrich_record(record: dict, client: anthropic.Anthropic,
             retry = stage1_search(client, record, obs, refined_exclude=prior_name)
             if not retry.get("_error"):
                 stage1_result = retry
+                stage1_result["_prior_entity_name"] = prior_name  # passed to stage3b
 
     # ── Stage 2: NAICS-filtered embeddings industry snap ($0) ─────────────────
     industry_raw = stage1_result.get("industry_raw") or ""
@@ -1503,24 +1542,36 @@ def enrich_record(record: dict, client: anthropic.Anthropic,
         elif stage3_result.get("website_verified") is False:
             stage1_result["website_confidence"] = min(w_conf, 0.45)
 
-    # ── Stage 3b: targeted size search (missing or low-confidence size) ────────
+    # ── Stage 3b: targeted size search ───────────────────────────────────────
     s_conf_after_gate = float(stage1_result.get("size_confidence", 0.0))
     size_after_gate = stage1_result.get("candidate_size")
-    if entity_verdict in ("MATCH", "MATCH") or stage0.get("entity_confirmed"):
-        if _is_nan(size_after_gate) or s_conf_after_gate < 0.55:
-            size_result = stage3b_size_search(client, record, obs)
-            if not size_result.get("_error"):
-                new_s_conf = float(size_result.get("size_confidence", 0.0))
-                if new_s_conf > s_conf_after_gate and size_result.get("candidate_size"):
-                    stage1_result["candidate_size"] = size_result["candidate_size"]
-                    stage1_result["size_confidence"] = new_s_conf
-                    log.info("Stage 3b size upgrade [%s]: %s → %s (%.2f)",
-                             record["handle"], size_after_gate,
-                             size_result["candidate_size"], new_s_conf)
+    # Fire when: (a) MATCH/confirmed entity with missing or low-confidence size, OR
+    #            (b) PARENT/SUBSIDIARY — size from stage1 is scoped to the wrong entity;
+    #                always re-search regardless of reported confidence.
+    run_3b_match = (entity_verdict == "MATCH" or stage0.get("entity_confirmed")) and \
+                   (_is_nan(size_after_gate) or s_conf_after_gate < 0.55)
+    run_3b_mismatch = entity_verdict in ("PARENT", "SUBSIDIARY")
+    if run_3b_match or run_3b_mismatch:
+        prior_entity = stage1_result.get("_prior_entity_name")
+        size_result = stage3b_size_search(
+            client, record, obs,
+            entity_verdict=entity_verdict,
+            prior_entity=prior_entity,
+        )
+        if not size_result.get("_error"):
+            new_s_conf = float(size_result.get("size_confidence", 0.0))
+            if new_s_conf > s_conf_after_gate and size_result.get("candidate_size"):
+                stage1_result["candidate_size"] = size_result["candidate_size"]
+                stage1_result["size_confidence"] = new_s_conf
+                log.info("Stage 3b size upgrade [%s]: %s → %s (%.2f)",
+                         record["handle"], size_after_gate,
+                         size_result["candidate_size"], new_s_conf)
 
-    # ── Stage 3c: closure verification (still_operating=null after Stage 1b) ───
-    # Only runs on the parametric path — Stage 1 (search) already had web access.
-    if stage1_result.get("still_operating") is None and stage1_result.get("_stage") == "1b":
+    # ── Stage 3c: closure verification (still_operating=null) ───────────────────
+    # Runs on both Stage 1 and Stage 1b paths. Stage 1's general search may miss
+    # closure signals that a targeted query finds (e.g. acquisition announcements,
+    # "permanently closed" pages) — so we always verify when still_operating is null.
+    if stage1_result.get("still_operating") is None:
         phase_cost = obs.get_phase_cost("part_4")
         if phase_cost < PART4_BUDGET:
             closure_result = stage3c_closure_verify(client, record, obs)
@@ -1761,7 +1812,7 @@ def generate_run_report(df: "pd.DataFrame", total_spent: float) -> None:
     # ── Stage distribution ──────────────────────────────────────────────────────
     h("Stage Distribution")
     if "stage_resolved" in df.columns:
-        stage_counts = df["stage_resolved"].value_counts(dropna=False).sort_index()
+        stage_counts = df["stage_resolved"].map(lambda x: int(x) if x is not None and str(x).isdigit() else x).value_counts(dropna=False).sort_index(key=lambda s: s.map(lambda v: (0, int(v)) if isinstance(v, (int, float)) and not (v != v) else (1, str(v))))
         lines.append("| Highest stage reached | Count | % |")
         lines.append("|----------------------|------:|--:|")
         stage_labels = {0: "Stage 0 only (budget/skip)", 1: "Stage 1/1b (Haiku search)",
@@ -1954,7 +2005,8 @@ def generate_run_report(df: "pd.DataFrame", total_spent: float) -> None:
 # ── Main ───────────────────────────────────────────────────────────────────────
 
 def run_part4(limit: Optional[int] = None,
-              handles: Optional[List[str]] = None) -> None:
+              handles: Optional[List[str]] = None,
+              force: bool = False) -> None:
     obs = ObservabilityLogger()
 
     # Entry gates
@@ -2022,20 +2074,23 @@ def run_part4(limit: Optional[int] = None,
         # Micro-delay to avoid rate limits
         time.sleep(0.10)
 
-    # Write output parquet via DuckDB — merge with existing when running specific handles
+    # Write output parquet via DuckDB — always upsert into existing file unless --force
     import pandas as pd
     new_df = pd.DataFrame(results)
 
-    if handles is not None and Path(ENRICHED_PATH).exists():
+    if not force and Path(ENRICHED_PATH).exists():
         existing_df = duckdb.connect().execute(
             f"SELECT * FROM parquet_scan('{ENRICHED_PATH}')"
         ).df()
-        # Drop any existing rows for handles being re-run, then append
-        existing_df = existing_df[~existing_df["handle"].isin(set(handles))]
+        # Drop any existing rows for handles being (re-)run, then append
+        existing_df = existing_df[~existing_df["handle"].isin(set(new_df["handle"]))]
         out_df = pd.concat([existing_df, new_df], ignore_index=True)
-        log.info("Merged %d existing + %d new records", len(existing_df), len(new_df))
+        log.info("Upserted %d new records into existing %d → total %d",
+                 len(new_df), len(existing_df), len(out_df))
     else:
         out_df = new_df
+        if force:
+            log.warning("--force: overwriting existing enriched output (%d records)", len(new_df))
 
     Path(ENRICHED_PATH).parent.mkdir(parents=True, exist_ok=True)
     out_con = duckdb.connect()
@@ -2067,7 +2122,9 @@ if __name__ == "__main__":
     parser.add_argument("--limit", type=int, default=None,
                         help="Process only the first N records (for test runs)")
     parser.add_argument("--handles", type=str, default=None,
-                        help="Comma-separated list of handles to run (merges into existing enriched output)")
+                        help="Comma-separated list of handles to run (upserts into existing enriched output)")
+    parser.add_argument("--force", action="store_true", default=False,
+                        help="Overwrite the enriched parquet instead of upserting (destructive)")
     args = parser.parse_args()
     handle_list = [h.strip() for h in args.handles.split(",")] if args.handles else None
-    run_part4(limit=args.limit, handles=handle_list)
+    run_part4(limit=args.limit, handles=handle_list, force=args.force)

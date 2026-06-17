@@ -29,55 +29,33 @@ _Spot-check: n=15 per gap, pure SQL, no LLM_
 
 ### Top 5 Structural Gaps (Sonnet Synthesis)
 
-#### Gap 1: Transportation and Warehousing is covered at just 1.99% overall and shows HIGH_GAP status across all 48 measured states including major logistics markets California (10,385 records, 1.87%), Texas (8,288 records, 1.89%), and Florida (8,088 records, 1.76%), leaving the platform nearly blind in a sector where freight and 3PL buyers actively source carriers.
+**Gap 1 — Transportation and Warehousing (NAICS 48-49)** · 1.99% overall; HIGH_GAP all 48 states; 34.5% vs SUSB employer firms · Confidence 0.88 · Verifier: ✓ CONFIRMED
 
-**NAICS**: 48-49 — Transportation and Warehousing
-**Prevalence**: 1.99% overall coverage; all 48 measured states rated HIGH_GAP; largest Tier A states range from 1.32% (Maryland) to 3.25% (Wisconsin); 34.5% coverage vs. SUSB employer firms
-**Root cause**: NES inflation driven by gig workers and sole-operator drivers structurally depresses the coverage denominator, but a real employer-firm gap also exists at 34.5% vs. SUSB — the recoverable portion sits in FMCSA carrier registries and state DOT databases that have not been systematically ingested.
-**Commercial impact**: Outbound AEs selling freight tech, fuel cards, and fleet services to trucking operators and 3PLs cannot build viable prospect lists from current inventory; churn risk is elevated for customers who buy transportation-sector lists and receive thin, low-confidence results.
-**Enrichment approach**: Ingest FMCSA Motor Carrier database and state DOT carrier registries to surface employer-level trucking and warehousing firms not currently in the platform.
-**Agent confidence**: 0.88 — FMCSA and DOT registries are public and well-structured, but the 94% NES share means a portion of the headline gap is structural and unrecoverable, limiting the ceiling on enrichment yield.
-**Verifier verdict**: ✓ CONFIRMED — NES inflates comparator (94% non-employers) but employer-firm coverage vs. SUSB is only 34.5% — real sourcing gap confirmed.
+FMCSA and DOT carrier registries not ingested. NES inflation (94% non-employers) raises the comparator denominator but the employer-firm gap is real and recoverable. Commercial signal: freight tech, fuel card, and fleet-service AEs cannot build viable prospect lists from current inventory.
 
-#### Gap 2: Construction coverage sits at just 5.93% overall and is rated HIGH_GAP in all 48 measured states — including the four largest construction markets California (25,900 records, 8.05%), Texas (20,796 records, 4.82%), Florida (16,640 records, 4.55%), and New York (12,130 records, 6.29%) — creating a systemic blind spot in a high-velocity B2B vertical where GCs and subs procure equipment, materials, and services at scale.
+---
 
-**NAICS**: 23 — Construction
-**Prevalence**: 5.93% overall coverage; all 48 measured states rated HIGH_GAP; coverage ranges from 2.8% (Mississippi) to 9.97% (Washington); 28.0% coverage vs. SUSB employer firms
-**Root cause**: Construction firms are heavily licensed at the state level but are fragmented across thousands of local licensing boards and permitting databases that require state-by-state ingestion; the platform has not systematically tapped these public registries, leaving the majority of employer-level contractors unrepresented.
-**Commercial impact**: AEs selling construction tech, equipment financing, and material supply solutions to GCs and specialty subcontractors face near-universal territory gaps; customers building contractor prospecting lists in any state will encounter sub-10% coverage, driving list fatigue and churn.
-**Enrichment approach**: Prioritize state contractor licensing boards and building permit databases in the top 10 construction-volume states, supplemented by AGC and regional GC directory crawls, to surface employer-level firms.
-**Agent confidence**: 0.90 — State licensing data is granular and public with high employer-firm signal, but the 48-state uniformity of the gap indicates the effort is broad rather than targeted, and ingestion timelines will vary by state licensing board API availability.
-**Verifier verdict**: ✓ CONFIRMED — NES inflates comparator (79% non-employers) but employer-firm coverage vs. SUSB is only 28.0% — real sourcing gap confirmed.
+**Gap 2 — Construction (NAICS 23)** · 5.93% overall; HIGH_GAP all 48 states; 28.0% vs SUSB employer firms · Confidence 0.90 · Verifier: ✓ CONFIRMED
 
-#### Gap 3: Retail Trade is covered at only 6.19% overall and is rated HIGH_GAP in all 48 measured states, with major retail markets including California (27,262 records, 9.29%), New York (16,716 records, 9.75%), Texas (12,889 records, 4.97%), and Florida (11,817 records, 5.23%) each falling well below 10% coverage, undermining the platform's value for any sales motion targeting retail SMBs.
+State contractor licensing boards and building permit databases not systematically ingested. 48-state uniformity of the gap signals a sourcing miss, not a quality issue. Commercial signal: construction tech and equipment financing AEs face sub-10% coverage in every state — no viable territory to run.
 
-**NAICS**: 44-45 — Retail Trade
-**Prevalence**: 6.19% overall coverage; all 48 measured states rated HIGH_GAP; coverage ranges from 2.93% (Mississippi) to 9.75% (New York); 25.5% coverage vs. SUSB employer firms
-**Root cause**: NES inflation is significant at 75.7% for retail, but the employer-firm gap at 25.5% vs. SUSB is real and recoverable; franchise registries and state retail licensing databases — which are public and granular — have not been systematically ingested, leaving independent retailers and franchisees absent from the platform.
-**Commercial impact**: Outbound AEs targeting retail SMBs for POS systems, supply chain software, and staffing solutions cannot identify the majority of their addressable market; independent retailers and franchisees are the dominant deal motion in the segment and are disproportionately missing.
-**Enrichment approach**: Ingest franchise disclosure registries, state retail licensing records, and commercial real estate databases to identify employer-level retail locations and chains not currently represented.
-**Agent confidence**: 0.87 — Franchise and licensing data provide good employer-firm signal, but the high NES share (75.7%) means a substantial fraction of the headline gap reflects non-employer sole proprietors that are not actionable B2B targets, requiring careful filtering post-ingestion.
-**Verifier verdict**: ✓ CONFIRMED — NES inflates comparator (76% non-employers) but employer-firm coverage vs. SUSB is only 25.5% — real sourcing gap confirmed.
+---
 
-#### Gap 4: Enterprise firms with 500 or more employees represent only 1.65% of platform records (69,109 companies) despite being the dominant segment by B2B revenue value, creating a sourcing volume gap that is invisible to fill-rate metrics because the records that exist are adequately enriched at 80.9% website fill.
+**Gap 3 — Retail Trade (NAICS 44-45)** · 6.19% overall; HIGH_GAP all 48 states; 25.5% vs SUSB employer firms · Confidence 0.87 · Verifier: ✓ CONFIRMED
 
-**NAICS**: None — None
-**Prevalence**: 1.65% of total records (69,109 enterprise firms); website fill at 80.9% masks the volume gap; enterprise segment is the smallest of all five size bands by record count
-**Root cause**: Enterprise firms are numerically rare relative to SMBs but disproportionately valuable; the platform's sourcing pipelines appear calibrated toward high-volume SMB ingestion, resulting in a structurally thin enterprise layer that cannot be closed by improving fill rates on existing records — new firms must be sourced.
-**Commercial impact**: Enterprise AEs and account-based marketing teams targeting holding companies, large manufacturers, and multi-site operators find an addressable universe that is too small to run meaningful ABM programs; this is a direct churn and expansion risk for enterprise-tier customers.
-**Enrichment approach**: Source net-new enterprise firms via SEC filings (10-K, proxy statements), D&B and Refinitiv company registries, and corporate hierarchy databases to expand the enterprise record pool independent of fill-rate improvements.
-**Agent confidence**: 0.88 — The gap is clearly evidenced by the 1.65% share figure, but the exact size of the recoverable universe is uncertain because enterprise firm counts are inherently small and some firms may already be captured under subsidiary or DBA records.
-**Verifier verdict**: ~ PLAUSIBLE — Size-dimension gap — no NAICS code; verified via Part 1 size quality summary (enterprise 1.65% of records, website fill 80.9%). SQL spot-check not applicable.
+Franchise disclosure registries and state retail licensing records not ingested. NES inflation (75.7% non-employers) accounts for some of the headline gap; recoverable employer-firm layer is real. Commercial signal: POS, supply chain, and staffing AEs cannot identify the majority of their retail SMB TAM.
 
-#### Gap 5: Micro-firm records (1–10 employees) in truck transportation (17,208 records, 58.1% website fill) and restaurants (21,723 records, 56.7% website fill) represent the worst-performing industry×size intersections in the platform, with roughly 4 in 10 records in each cohort lacking a website — degrading deliverability and contact quality for the exact SMB segments where Transportation and Accommodation gaps are most acute.
+---
 
-**NAICS**: 48-49 — Transportation and Warehousing (micro-firm band, with Restaurants as secondary cross)
-**Prevalence**: 17,208 micro truck transportation records at 58.1% website fill; 21,723 micro restaurant records at 56.7% website fill; micro segment overall is 59.85% of all records (2,503,111) with 73.7% average website fill — these two sub-segments are 15–17 points below segment average
-**Root cause**: Micro-sized operators in trucking and food service are disproportionately reliant on phone-based or offline business models with low or no web presence; existing sourcing pipelines capture the company record from directories or registries but cannot resolve a website because many of these firms genuinely lack one, requiring alternative contact enrichment strategies.
-**Commercial impact**: Sales teams building outbound sequences for last-mile logistics tech, fleet fuel cards, restaurant supply, and hospitality staffing face deliverability failures when email or web-based contact signals are missing from micro-firm records; this degrades campaign conversion rates and erodes trust in list quality for SMB-focused customers.
-**Enrichment approach**: Apply phone-first and address-based contact enrichment for micro-band trucking and restaurant records using FMCSA carrier contacts, state food service licensing registries, and reverse-phone append vendors to provide alternative contact vectors where websites are absent.
-**Agent confidence**: 0.83 — The website fill figures are directly observed in the data and the cross-dimension pattern is clear, but the proportion of these records where a website genuinely does not exist versus where it simply has not been sourced is unknown, limiting the recoverable fraction estimate.
-**Verifier verdict**: ✓ CONFIRMED — NES inflates comparator (94% non-employers) but employer-firm coverage vs. SUSB is only 34.5% — real sourcing gap confirmed.
+**Gap 4 — Enterprise sourcing volume (cross-cut, no NAICS)** · 1.65% of records (69,109 firms); website fill 80.9% masks the volume gap · Confidence 0.88 · Verifier: ~ PLAUSIBLE
+
+Sourcing pipelines calibrated toward high-volume SMB ingestion; enterprise firms are numerically rare but disproportionately valuable. Fill-rate improvements don't close this — new firms must be sourced via SEC filings, D&B, and corporate hierarchy databases. Commercial signal: ABM programs for enterprise-tier customers don't have enough records to run at scale.
+
+---
+
+**Gap 5 — Micro-firm website fill: trucking and restaurants** · 17,208 micro truck transport records at 58.1% website fill; 21,723 micro restaurant records at 56.7% — 15-17 points below segment average · Confidence 0.83 · Verifier: ✓ CONFIRMED
+
+Many micro-operators are genuinely phone-first or offline; sourcing captures the company record but can't resolve a URL. Standard web discovery won't work — alternative enrichment (FMCSA carrier contacts, state food service licensing, reverse-phone append) needed. Commercial signal: outbound sequences for last-mile logistics, fleet fuel, restaurant supply, and hospitality staffing face systematic deliverability gaps.
 
 **Cross-gap pattern**: Four of the five gaps share a common root: the platform's sourcing pipelines have not systematically tapped public regulatory registries (FMCSA, state licensing boards, franchise filings, SEC) that contain dense, employer-level firm signals in exactly the sectors and size bands most valued by B2B buyers. The fifth gap (enterprise sourcing volume) reflects a deliberate or implicit SMB-first ingestion posture that leaves the highest-value size band structurally underrepresented regardless of fill-rate quality.
 

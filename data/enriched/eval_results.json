@@ -3,9 +3,9 @@
     "ground_truth_records": 20,
     "enriched_records_matched": 20,
     "unmatched_handles": [],
-    "macro_precision": 0.656,
-    "macro_recall": 0.656,
-    "macro_f1": 0.656
+    "macro_precision": 0.731,
+    "macro_recall": 0.71,
+    "macro_f1": 0.72
   },
   "per_field": {
     "website": {
@@ -18,27 +18,27 @@
     },
     "type": {
       "tp": 18,
-      "fp": 2,
+      "fp": 1,
       "fn": 2,
-      "precision": 0.9,
+      "precision": 0.947,
       "recall": 0.9,
-      "f1": 0.9
+      "f1": 0.923
     },
     "industry": {
-      "tp": 12,
-      "fp": 8,
-      "fn": 8,
-      "precision": 0.6,
-      "recall": 0.6,
-      "f1": 0.6
+      "tp": 15,
+      "fp": 4,
+      "fn": 5,
+      "precision": 0.789,
+      "recall": 0.75,
+      "f1": 0.769
     },
     "size": {
-      "tp": 6,
-      "fp": 10,
-      "fn": 10,
-      "precision": 0.375,
-      "recall": 0.375,
-      "f1": 0.375
+      "tp": 7,
+      "fp": 9,
+      "fn": 9,
+      "precision": 0.438,
+      "recall": 0.438,
+      "f1": 0.438
     }
   },
   "per_segment": {
@@ -53,19 +53,19 @@
       },
       "type": {
         "tp": 10,
-        "fp": 2,
+        "fp": 1,
         "fn": 2,
-        "precision": 0.833,
+        "precision": 0.909,
         "recall": 0.833,
-        "f1": 0.833
+        "f1": 0.87
       },
       "industry": {
-        "tp": 7,
-        "fp": 5,
-        "fn": 5,
-        "precision": 0.583,
-        "recall": 0.583,
-        "f1": 0.583
+        "tp": 10,
+        "fp": 1,
+        "fn": 2,
+        "precision": 0.909,
+        "recall": 0.833,
+        "f1": 0.87
       },
       "size": {
         "tp": 4,
@@ -102,13 +102,99 @@
         "f1": 0.625
       },
       "size": {
-        "tp": 2,
-        "fp": 4,
-        "fn": 4,
-        "precision": 0.333,
-        "recall": 0.333,
-        "f1": 0.333
+        "tp": 3,
+        "fp": 3,
+        "fn": 3,
+        "precision": 0.5,
+        "recall": 0.5,
+        "f1": 0.5
       }
+    }
+  },
+  "size_ordinal": {
+    "total_mismatches": 9,
+    "within_one_band": 6,
+    "within_one_band_rate": 0.667,
+    "avg_band_distance": 1.67
+  },
+  "source_reliability": {
+    "website": {
+      "enterprise": {
+        "correct": 5,
+        "incorrect": 8,
+        "unknown": 47,
+        "reliability": 0.385
+      },
+      "mid_market": {
+        "correct": 6,
+        "incorrect": 6,
+        "unknown": 64,
+        "reliability": 0.5
+      }
+    },
+    "type": {
+      "enterprise": {
+        "correct": 15,
+        "incorrect": 4,
+        "unknown": 41,
+        "reliability": 0.789
+      },
+      "mid_market": {
+        "correct": 13,
+        "incorrect": 4,
+        "unknown": 59,
+        "reliability": 0.765
+      }
+    },
+    "industry": {
+      "enterprise": {
+        "correct": 17,
+        "incorrect": 17,
+        "unknown": 26,
+        "reliability": 0.5
+      },
+      "mid_market": {
+        "correct": 14,
+        "incorrect": 30,
+        "unknown": 32,
+        "reliability": 0.318
+      }
+    },
+    "size": {
+      "enterprise": {
+        "correct": 14,
+        "incorrect": 30,
+        "unknown": 16,
+        "reliability": 0.318
+      },
+      "mid_market": {
+        "correct": 35,
+        "incorrect": 27,
+        "unknown": 14,
+        "reliability": 0.565
+      }
+    }
+  },
+  "calibration": {
+    "website": {
+      "high_conf_count": 10,
+      "high_conf_correct": 7,
+      "calibration_rate": 0.7
+    },
+    "type": {
+      "high_conf_count": 17,
+      "high_conf_correct": 16,
+      "calibration_rate": 0.941
+    },
+    "industry": {
+      "high_conf_count": 18,
+      "high_conf_correct": 14,
+      "calibration_rate": 0.778
+    },
+    "size": {
+      "high_conf_count": 7,
+      "high_conf_correct": 4,
+      "calibration_rate": 0.571
     }
   },
   "mismatches": [
@@ -123,15 +209,9 @@
       "handle": "company/avera-mckennan-hospital",
       "field": "size",
       "gt": "1K-5K",
-      "pred": "10K+",
-      "segment": "enterprise"
-    },
-    {
-      "handle": "company/brownsville-isd",
-      "field": "industry",
-      "gt": "primary and secondary education",
-      "pred": "higher education",
-      "segment": "enterprise"
+      "pred": "5K-10K",
+      "segment": "enterprise",
+      "band_distance": 1
     },
     {
       "handle": "company/stolt-nielsen-usa-inc",
@@ -144,50 +224,32 @@
       "handle": "company/stolt-nielsen-usa-inc",
       "field": "size",
       "gt": "501-1K",
-      "pred": "201-500",
-      "segment": "enterprise"
-    },
-    {
-      "handle": "company/faegre-baker-daniels-llp",
-      "field": "size",
-      "gt": "1K-5K",
-      "pred": "501-1K",
-      "segment": "enterprise"
-    },
-    {
-      "handle": "company/alpine-access",
-      "field": "industry",
-      "gt": "outsourcing and offshoring consulting",
-      "pred": "business consulting and services",
-      "segment": "enterprise"
+      "pred": "11-50",
+      "segment": "enterprise",
+      "band_distance": 3
     },
     {
       "handle": "company/alpine-access",
       "field": "size",
       "gt": "1K-5K",
       "pred": "501-1K",
-      "segment": "enterprise"
+      "segment": "enterprise",
+      "band_distance": 1
     },
     {
-      "handle": "company/national-labor-relations-board",
+      "handle": "company/oregon-department-of-corrections",
       "field": "industry",
-      "gt": "government administration",
-      "pred": "government relations",
+      "gt": "public safety",
+      "pred": "law practice",
       "segment": "enterprise"
     },
     {
-      "handle": "company/national-labor-relations-board",
+      "handle": "company/whatabrands-llc",
       "field": "size",
-      "gt": "1K-5K",
-      "pred": "501-1K",
-      "segment": "enterprise"
-    },
-    {
-      "handle": "company/one-more-startup-in-stealth-mode",
-      "field": "type",
-      "gt": "Self-Employed",
-      "pred": "Privately Held",
-      "segment": "enterprise"
+      "gt": "5K-10K",
+      "pred": "1K-5K",
+      "segment": "enterprise",
+      "band_distance": 1
     },
     {
       "handle": "company/boeing-commercial-space-company",
@@ -198,38 +260,33 @@
     },
     {
       "handle": "company/boeing-commercial-space-company",
+      "field": "type",
+      "gt": "Public Company",
+      "pred": null,
+      "segment": "enterprise"
+    },
+    {
+      "handle": "company/boeing-commercial-space-company",
       "field": "industry",
       "gt": "aviation and aerospace component manufacturing",
-      "pred": "defense and space manufacturing",
+      "pred": null,
       "segment": "enterprise"
     },
     {
       "handle": "company/north-haven-school-district",
-      "field": "industry",
-      "gt": "primary and secondary education",
-      "pred": "higher education",
-      "segment": "enterprise"
+      "field": "size",
+      "gt": "501-1K",
+      "pred": "1K-5K",
+      "segment": "enterprise",
+      "band_distance": 1
     },
     {
       "handle": "company/car-source-collision-center",
       "field": "size",
       "gt": "1K-5K",
       "pred": "11-50",
-      "segment": "enterprise"
-    },
-    {
-      "handle": "company/barbounia-restaurant-nyc",
-      "field": "size",
-      "gt": "51-200",
-      "pred": "11-50",
-      "segment": "mid_market"
-    },
-    {
-      "handle": "company/mercy-hospital-cadillac",
-      "field": "size",
-      "gt": "201-500",
-      "pred": "51-200",
-      "segment": "mid_market"
+      "segment": "enterprise",
+      "band_distance": 4
     },
     {
       "handle": "company/governor-shapiro",
@@ -242,8 +299,9 @@
       "handle": "company/governor-shapiro",
       "field": "size",
       "gt": "201-500",
-      "pred": "1K-5K",
-      "segment": "mid_market"
+      "pred": "11-50",
+      "segment": "mid_market",
+      "band_distance": 2
     },
     {
       "handle": "company/hoboken-hospitality",
@@ -264,7 +322,8 @@
       "field": "size",
       "gt": "201-500",
       "pred": "51-200",
-      "segment": "mid_market"
+      "segment": "mid_market",
+      "band_distance": 1
     },
     {
       "handle": "company/willamette-esd-school-district",
@@ -277,8 +336,16 @@
       "handle": "company/willamette-esd-school-district",
       "field": "industry",
       "gt": "primary and secondary education",
-      "pred": "advertising services",
+      "pred": "higher education",
       "segment": "mid_market"
+    },
+    {
+      "handle": "company/willamette-esd-school-district",
+      "field": "size",
+      "gt": "201-500",
+      "pred": "501-1K",
+      "segment": "mid_market",
+      "band_distance": 1
     }
   ]
 }
